@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>VPN Monkey</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14161a;
+    --surface: #1c1f24;
+    --surface-2: #23272d;
+    --border: #2b2f36;
+    --green: #3ddc6a;
+    --green-dim: #1f6b3a;
+    --green-text-on: #06210f;
+    --text-primary: #eef2f0;
+    --text-secondary: #9aa39d;
+    --text-muted: #6b7169;
+    --danger: #ff6b6b;
+    --radius: 16px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 20px 16px 32px; }
+
+  .header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+  .header .logo {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: var(--green-dim);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .header .title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700; font-size: 18px; letter-spacing: 0.2px;
+  }
+  .header .sub { font-size: 12px; color: var(--text-muted); margin-top: -2px; }
+
+  .status-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 20px;
+    display: flex; align-items: center; gap: 20px;
+    margin-bottom: 14px;
+  }
+  .ring-wrap { position: relative; width: 92px; height: 92px; flex-shrink: 0; }
+  .ring-wrap svg { transform: rotate(-90deg); }
+  .ring-bg { fill: none; stroke: var(--surface-2); stroke-width: 8; }
+  .ring-fg { fill: none; stroke: var(--green); stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
+  .ring-center {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+  }
+  .ring-center .num { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; line-height: 1; }
+  .ring-center .lbl { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+  .status-info { flex: 1; min-width: 0; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--green-dim); color: var(--green);
+    font-size: 12px; font-weight: 500; padding: 4px 10px;
+    border-radius: 100px; margin-bottom: 8px;
+  }
+  .status-pill.expired { background: #3a1f22; color: var(--danger); }
+  .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .status-info .desc { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+
+  .link-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .link-card .label {
+    font-size: 12px; color: var(--text-muted); margin-bottom: 8px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .link-row {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface-2); border-radius: 10px; padding: 10px 12px;
+  }
+  .link-row .link-text {
+    flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .copy-btn {
+    background: var(--green); color: var(--green-text-on);
+    border: none; border-radius: 8px; padding: 8px 14px;
+    font-family: 'Inter', sans-serif; font-weight: 600; font-size: 12px;
+    cursor: pointer; flex-shrink: 0; transition: transform 0.15s ease;
+  }
+  .copy-btn:active { transform: scale(0.95); }
+  .copy-btn.copied { background: var(--surface-2); color: var(--green); }
+
+  .steps { margin-top: 14px; }
+  .steps summary {
+    cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-secondary);
+    list-style: none; display: flex; align-items: center; justify-content: space-between;
+  }
+  .steps summary::-webkit-details-marker { display: none; }
+  .steps summary .chevron { transition: transform 0.2s ease; color: var(--text-muted); }
+  .steps[open] summary .chevron { transform: rotate(180deg); }
+  .steps .step-list { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .step-item { display: flex; gap: 10px; font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.5; }
+  .step-item .num {
+    flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--surface-2); color: var(--green);
+    font-size: 11px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step-item b { color: var(--text-primary); }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .action-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; text-align: left; cursor: pointer; transition: border-color 0.15s ease;
+  }
+  .action-card:active { border-color: var(--green-dim); }
+  .action-card .icon { font-size: 20px; margin-bottom: 8px; display: block; }
+  .action-card .name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+  .action-card .hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  .plans { display: none; margin-bottom: 14px; }
+  .plans.open { display: block; }
+  .plan-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 8px; cursor: pointer;
+  }
+  .plan-row.featured { border-color: var(--green-dim); }
+  .plan-row .p-name { font-size: 14px; font-weight: 500; }
+  .plan-row .p-badge { font-size: 10px; color: var(--green); margin-top: 2px; }
+  .plan-row .p-price { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; }
+
+  .primary-btn {
+    width: 100%; background: var(--green); color: var(--green-text-on);
+    border: none; border-radius: 12px; padding: 15px; font-size: 14px;
+    font-weight: 600; font-family: 'Inter', sans-serif; cursor: pointer; margin-bottom: 10px;
+  }
+  .primary-btn:active { transform: scale(0.99); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div class="logo">🐒</div>
+    <div>
+      <div class="title">VPN Monkey</div>
+      <div class="sub" id="username-line">с возвращением</div>
+    </div>
+  </div>
+
+  <div class="status-card">
+    <div class="ring-wrap">
+      <svg width="92" height="92" viewBox="0 0 92 92">
+        <circle class="ring-bg" cx="46" cy="46" r="40"></circle>
+        <circle class="ring-fg" id="ring-progress" cx="46" cy="46" r="40"
+          stroke-dasharray="251" stroke-dashoffset="70"></circle>
+      </svg>
+      <div class="ring-center">
+        <div class="num" id="days-num">2</div>
+        <div class="lbl">дня</div>
+      </div>
+    </div>
+    <div class="status-info">
+      <div class="status-pill">
+        <span class="dot"></span>
+        <span>Пробный период</span>
+      </div>
+      <div class="desc">Осталось 2 дня бесплатного доступа. Продли подписку, чтобы не потерять соединение.</div>
+    </div>
+  </div>
+
+  <div class="link-card">
+    <div class="label">
+      <span>Ссылка подписки</span>
+      <span style="color: var(--text-muted);">вставь один раз</span>
+    </div>
+    <div class="link-row">
+      <span class="link-text" id="sub-link">https://vpnmonkey.app/sub/a8f2c91b3e...</span>
+      <button class="copy-btn" id="copy-btn" onclick="copyLink()">Копировать</button>
+    </div>
+
+    <details class="steps">
+      <summary>
+        <span>Как подключиться</span>
+        <span class="chevron">⌄</span>
+      </summary>
+      <div class="step-list">
+        <div class="step-item">
+          <span class="num">1</span>
+          <span>Установи <b>v2rayNG</b> (Android) или <b>Hiddify / Happ</b> (iPhone, Mac, Windows)</span>
+        </div>
+        <div class="step-item">
+          <span class="num">2</span>
+          <span>В приложении выбери <b>«Добавить подписку по ссылке»</b> и вставь скопированную ссылку</span>
+        </div>
+        <div class="step-item">
+          <span class="num">3</span>
+          <span>Нажми <b>«Подключить»</b> — дальше ссылка обновляется сама, руками ничего менять не нужно</span>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <div class="grid">
+    <div class="action-card" onclick="togglePlans()">
+      <span class="icon">💳</span>
+      <div class="name">Тарифы</div>
+      <div class="hint">от 99₽/мес</div>
+    </div>
+    <div class="action-card" onclick="sendToBot('referral')">
+      <span class="icon">👥</span>
+      <div class="name">Пригласить</div>
+      <div class="hint">+2 дня за друга</div>
+    </div>
+    <div class="action-card" onclick="sendToBot('history')">
+      <span class="icon">📊</span>
+      <div class="name">История</div>
+      <div class="hint">платежи и дни</div>
+    </div>
+    <div class="action-card" onclick="sendToBot('support')">
+      <span class="icon">🆘</span>
+      <div class="name">Поддержка</div>
+      <div class="hint">написать нам</div>
+    </div>
+  </div>
+
+  <div class="plans" id="plans-block">
+    <div class="plan-row" onclick="buyPlan(30, 99)">
+      <div><div class="p-name">1 месяц</div></div>
+      <div class="p-price">99₽</div>
+    </div>
+    <div class="plan-row featured" onclick="buyPlan(90, 249)">
+      <div><div class="p-name">3 месяца</div><div class="p-badge">выгоднее на 16%</div></div>
+      <div class="p-price">249₽</div>
+    </div>
+    <div class="plan-row" onclick="buyPlan(180, 449)">
+      <div><div class="p-name">6 месяцев</div></div>
+      <div class="p-price">449₽</div>
+    </div>
+    <div class="plan-row" onclick="buyPlan(365, 799)">
+      <div><div class="p-name">12 месяцев</div><div class="p-badge">выгоднее на 33%</div></div>
+      <div class="p-price">799₽</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const tg = window.Telegram ? window.Telegram.WebApp : null;
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get('token');
+
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
+    if (user && user.first_name) {
+      document.getElementById('username-line').textContent = 'привет, ' + user.first_name;
+    }
+  }
+
+  const TRIAL_TOTAL_DAYS = 3; // используется только для расчета процента кольца на триале
+
+  async function loadStatus() {
+    if (!token) return; // открыли без токена (например, вручную) — остаются демо-значения
+    try {
+      const res = await fetch('/api/status?token=' + encodeURIComponent(token));
+      if (!res.ok) return;
+      const data = await res.json();
+
+      document.getElementById('days-num').textContent = data.days_left;
+      document.getElementById('sub-link').textContent = data.sub_link;
+
+      const pill = document.querySelector('.status-pill');
+      const desc = document.querySelector('.status-info .desc');
+      const ring = document.getElementById('ring-progress');
+      const circumference = 251;
+
+      if (!data.active) {
+        pill.classList.add('expired');
+        pill.querySelector('span:last-child').textContent = 'Не активна';
+        desc.textContent = 'Подписка закончилась. Выбери тариф ниже, чтобы продолжить пользоваться VPN.';
+        ring.setAttribute('stroke-dashoffset', circumference);
+      } else if (!data.trial_used) {
+        desc.textContent = `Осталось ${data.days_left} дн. бесплатного доступа. Продли подписку, чтобы не потерять соединение.`;
+        ring.setAttribute('stroke-dashoffset', circumference * (1 - data.days_left / TRIAL_TOTAL_DAYS));
+      } else {
+        pill.querySelector('span:last-child').textContent = 'Активна';
+        desc.textContent = `Осталось ${data.days_left} дн. Хорошего пользования!`;
+        ring.setAttribute('stroke-dashoffset', circumference * 0.15);
+      }
+    } catch (e) {
+      console.error('status load failed', e);
+    }
+  }
+  loadStatus();
+
+  function copyLink() {
+    const linkText = document.getElementById('sub-link').textContent;
+    const btn = document.getElementById('copy-btn');
+    navigator.clipboard.writeText(linkText).then(() => {
+      btn.textContent = 'Готово';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Копировать'; btn.classList.remove('copied'); }, 1500);
+    });
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+  }
+
+  function togglePlans() {
+    document.getElementById('plans-block').classList.toggle('open');
+  }
+
+  function buyPlan(days, price) {
+    if (tg) {
+      tg.sendData(JSON.stringify({ action: 'buy_plan', days, price }));
+    }
+  }
+
+  function sendToBot(action) {
+    if (tg) {
+      tg.sendData(JSON.stringify({ action }));
+    }
+  }
+</script>
+</body>
+</html>
