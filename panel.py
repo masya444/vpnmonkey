@@ -17,6 +17,7 @@
 """
 
 import logging
+import re
 import uuid
 
 import requests
@@ -45,9 +46,21 @@ def _get_session(server: ServerConfig) -> requests.Session:
 def _login(server: ServerConfig) -> bool:
     session = _get_session(server)
     try:
+        # Шаг 1: зайти на главную страницу панели, чтобы получить csrf-токен и cookie сессии.
+        # Без этого 3x-ui отвечает 403 на прямой POST /login (проверено на практике).
+        home_resp = session.get(f"{server.panel_url}/", timeout=10)
+        csrf_token = None
+        match = re.search(r'csrf-token"\s+content="([^"]+)"', home_resp.text)
+        if match:
+            csrf_token = match.group(1)
+
+        headers = {"X-CSRF-Token": csrf_token} if csrf_token else {}
+
+        # Шаг 2: логинимся, используя ту же сессию (cookie уже внутри session) + токен.
         resp = session.post(
             f"{server.panel_url}/login",
             data={"username": server.panel_username, "password": server.panel_password},
+            headers=headers,
             timeout=10,
         )
         ok = resp.ok and resp.json().get("success", False)
@@ -69,6 +82,11 @@ def pick_server() -> ServerConfig:
 def create_vpn_client(user_id: int) -> tuple[str, str] | None:
     """Создает клиента на выбранном сервере.
     Возвращает (client_uuid, server_name) или None при ошибке."""
+    if config.fake_vpn_server:
+        # Тестовый режим: без реального сервера просто выдаем фейковый UUID,
+        # чтобы вся остальная логика бота (меню, БД, триал) работала и её можно было проверить.
+        return str(uuid.uuid4()), "fake-server"
+
     server = pick_server()
     if not _login(server):
         return None
@@ -104,8 +122,11 @@ def build_vless_link(client_uuid: str, user_id: int, server_name: str) -> str:
     один раз из панели 3x-ui). Если пересоздашь inbound с нуля — Reality сгенерирует новые
     pbk/sid, и эти значения здесь придется обновить на новые (возьми их тем же способом:
     Клиенты -> иконка QR/ссылки -> разверни строку Vless/TCP/REALITY -> скопируй ссылку)."""
-    server = next(s for s in config.servers if s.name == server_name)
     email = f"user_{user_id}"
+    if server_name == "fake-server":
+        return f"vless://{client_uuid}@demo.vpnmonkey.test:443?security=reality#DEMO-{email}"
+
+    server = next(s for s in config.servers if s.name == server_name)
     return (
         f"vless://{client_uuid}@{server.public_host}:{server.public_port}"
         f"?encryption=none&fp=chrome"
@@ -121,3 +142,4 @@ def disable_client(server_name: str, client_uuid: str) -> bool:
     с enable=false — сделай по аналогии с create_vpn_client, когда дойдешь до
     автоматической деактивации просрочек (см. main.py -> TODO периодическая проверка)."""
     return True
+
