@@ -11,14 +11,20 @@
 """
 
 import base64
+import json
 import logging
+import os
+import time
 
 from aiohttp import web
 
 import database as db
 import panel
+from config import config
 
 log = logging.getLogger("subserver")
+
+MINIAPP_PATH = os.path.join(os.path.dirname(__file__), "miniapp.html")
 
 
 async def handle_subscription(request: web.Request) -> web.Response:
@@ -40,6 +46,33 @@ async def handle_subscription(request: web.Request) -> web.Response:
     return web.Response(text=body)
 
 
+async def handle_miniapp(request: web.Request) -> web.Response:
+    """Отдает саму страницу Mini App. Telegram открывает её внутри своего интерфейса."""
+    with open(MINIAPP_PATH, "r", encoding="utf-8") as f:
+        return web.Response(text=f.read(), content_type="text/html")
+
+
+async def handle_status_api(request: web.Request) -> web.Response:
+    """JSON-статус для конкретного пользователя (мини-аппка дергает это через fetch,
+    используя токен из query-параметра ?token=, который бот вписывает в ссылку на кнопке)."""
+    token = request.query.get("token", "")
+    user = db.get_user_by_sub_token(token)
+    if not user:
+        return web.json_response({"error": "not_found"}, status=404)
+
+    until = user.get("subscription_until", 0)
+    days_left = max(0, int((until - time.time()) // 86400) + (1 if until > time.time() else 0))
+    active = until > time.time()
+
+    return web.json_response({
+        "days_left": days_left,
+        "active": active,
+        "trial_used": bool(user.get("trial_used")),
+        "sub_link": f"{config.sub_public_base_url}/sub/{token}",
+        "referral_count": db.count_referrals(user["user_id"]),
+    })
+
+
 async def handle_health(request: web.Request) -> web.Response:
     return web.Response(text="ok")
 
@@ -47,6 +80,8 @@ async def handle_health(request: web.Request) -> web.Response:
 def create_app() -> web.Application:
     app = web.Application()
     app.router.add_get("/sub/{token}", handle_subscription)
+    app.router.add_get("/app", handle_miniapp)
+    app.router.add_get("/api/status", handle_status_api)
     app.router.add_get("/health", handle_health)
     return app
 
