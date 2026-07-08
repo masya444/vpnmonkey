@@ -37,6 +37,12 @@ class Config:
     trial_days: int = int(os.getenv("TRIAL_DAYS", "3"))
     referral_bonus_days: int = int(os.getenv("REFERRAL_BONUS_DAYS", "2"))
 
+    # Временный тестовый режим: True = бот не стучится в реальную VPN-панель,
+    # а выдает фейковый ключ. Нужен, чтобы проверить логику бота (меню, триал,
+    # рефералку, тарифы) до того, как появится настоящий VPN-сервер.
+    # Когда сервер будет готов — просто поставь FAKE_VPN_SERVER=false (или убери переменную).
+    fake_vpn_server: bool = os.getenv("FAKE_VPN_SERVER", "true").lower() == "true"
+
     plans: tuple = (
         ("1 месяц", 30, 99),
         ("3 месяца", 90, 249),
@@ -66,11 +72,15 @@ def validate_config() -> list[str]:
         errors.append("BOT_TOKEN не задан")
     if config.admin_id == 0:
         errors.append("ADMIN_ID не задан (узнать свой ID у @userinfobot)")
-    for s in config.servers:
-        if not s.panel_password:
-            errors.append(f"Пароль панели для сервера '{s.name}' не задан")
-        if "YOUR_SERVER_IP" in s.public_host:
-            errors.append(f"Не заменен публичный адрес сервера '{s.name}'")
-    if "YOUR_SERVER_IP" in config.sub_public_base_url:
-        errors.append("SUB_PUBLIC_BASE_URL не настроен (адрес для subscription-ссылок)")
+
+    # В тестовом режиме (без реального VPN-сервера) эти проверки пропускаем —
+    # они всё равно не заполнены, и это ожидаемо на этом этапе.
+    if not config.fake_vpn_server:
+        for s in config.servers:
+            if not s.panel_password:
+                errors.append(f"Пароль панели для сервера '{s.name}' не задан")
+            if "YOUR_SERVER_IP" in s.public_host:
+                errors.append(f"Не заменен публичный адрес сервера '{s.name}'")
+        if "YOUR_SERVER_IP" in config.sub_public_base_url:
+            errors.append("SUB_PUBLIC_BASE_URL не настроен (адрес для subscription-ссылок)")
     return errors
