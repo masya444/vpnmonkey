@@ -22,7 +22,7 @@ import time
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from config import config, validate_config
@@ -41,8 +41,13 @@ bot = Bot(token=config.bot_token)
 dp = Dispatcher()
 
 
-def main_menu_kb():
+def main_menu_kb(sub_token: str | None = None):
     kb = InlineKeyboardBuilder()
+    if sub_token:
+        kb.button(
+            text="🐒 Открыть приложение",
+            web_app=WebAppInfo(url=f"{config.sub_public_base_url}/app?token={sub_token}"),
+        )
     kb.button(text="🔑 Мой VPN", callback_data="my_key")
     kb.button(text="💳 Тарифы", callback_data="plans")
     kb.button(text="👥 Пригласить друга", callback_data="referral")
@@ -119,12 +124,13 @@ async def start_handler(message: Message):
     else:
         text = f"С возвращением! Статус подписки: {format_time_left(user['subscription_until'])}."
 
-    await message.answer(text, reply_markup=main_menu_kb())
+    await message.answer(text, reply_markup=main_menu_kb(user["sub_token"]))
 
 
 @dp.callback_query(F.data == "back_to_menu")
 async def back_to_menu(call: CallbackQuery):
-    await call.message.edit_text("Главное меню:", reply_markup=main_menu_kb())
+    user = db.get_user(call.from_user.id)
+    await call.message.edit_text("Главное меню:", reply_markup=main_menu_kb(user["sub_token"] if user else None))
     await call.answer()
 
 
@@ -140,7 +146,7 @@ async def my_key(call: CallbackQuery):
             await call.message.edit_text(
                 "Не получилось создать доступ — сервер временно недоступен. "
                 "Попробуй через пару минут, я уже знаю о проблеме.",
-                reply_markup=main_menu_kb(),
+                reply_markup=main_menu_kb(user["sub_token"]),
             )
             await notify_admin(f"create_vpn_client вернул None для user_id={user_id}")
             return
@@ -157,7 +163,7 @@ async def my_key(call: CallbackQuery):
             f"`{sub_link_for(user)}`\n\n"
             f"Как подключиться — жми кнопку «Как подключиться» в меню.",
             parse_mode="Markdown",
-            reply_markup=main_menu_kb(),
+            reply_markup=main_menu_kb(user["sub_token"]),
         )
         return
 
@@ -172,7 +178,7 @@ async def my_key(call: CallbackQuery):
         f"Твоя ссылка подписки:\n`{sub_link_for(user)}`\n\n"
         f"Статус: {format_time_left(user['subscription_until'])}.",
         parse_mode="Markdown",
-        reply_markup=main_menu_kb(),
+        reply_markup=main_menu_kb(user["sub_token"]),
     )
 
 
@@ -190,7 +196,7 @@ async def how_to(call: CallbackQuery):
         "После этого просто нажимай «Подключить» в приложении — обновлять ссылку вручную "
         "не нужно, она обновляется сама."
     )
-    await call.message.edit_text(text, parse_mode="Markdown", reply_markup=main_menu_kb())
+    await call.message.edit_text(text, parse_mode="Markdown", reply_markup=main_menu_kb(user["sub_token"]))
 
 
 @dp.callback_query(F.data == "plans")
@@ -202,12 +208,13 @@ async def plans(call: CallbackQuery):
 async def buy(call: CallbackQuery):
     _, days, price = call.data.split("_")
     db.log_payment(call.from_user.id, int(price), int(days), status="pending")
+    user = db.get_user(call.from_user.id)
     # TODO: реальная интеграция с ЮKassa/CryptoBot вместо ручного подтверждения.
     await call.message.edit_text(
         f"Тариф на {days} дней за {price}₽.\n\n"
         f"Пока оплата подключается вручную: напиши в поддержку с этим тарифом, "
         f"оплати переводом — и подписка активируется в течение нескольких минут.",
-        reply_markup=main_menu_kb(),
+        reply_markup=main_menu_kb(user["sub_token"]),
     )
     await notify_admin(
         f"Новая заявка на оплату: user_id={call.from_user.id}, "
@@ -221,19 +228,60 @@ async def referral(call: CallbackQuery):
     bot_info = await bot.get_me()
     link = f"https://t.me/{bot_info.username}?start=ref_{user_id}"
     count = db.count_referrals(user_id)
+    user = db.get_user(user_id)
     await call.message.edit_text(
         f"Приглашай друзей — за каждого +{config.referral_bonus_days} дня подписки тебе.\n\n"
         f"Твоя ссылка:\n{link}\n\nУже пригласил: {count} чел.",
-        reply_markup=main_menu_kb(),
+        reply_markup=main_menu_kb(user["sub_token"]),
     )
 
 
 @dp.callback_query(F.data == "support")
 async def support(call: CallbackQuery):
+    user = db.get_user(call.from_user.id)
     await call.message.edit_text(
         "Напиши свой вопрос прямо в этот чат — я передам его в поддержку.",
-        reply_markup=main_menu_kb(),
+        reply_markup=main_menu_kb(user["sub_token"]),
     )
+
+
+# --- Данные из мини-аппки ---
+
+@dp.message(F.web_app_data)
+async def handle_webapp_data(message: Message):
+    """Мини-аппка шлет сюда события через Telegram.WebApp.sendData() (см. miniapp.html)."""
+    import json as _json
+    try:
+        payload = _json.loads(message.web_app_data.data)
+    except Exception:
+        return
+
+    action = payload.get("action")
+    user_id = message.from_user.id
+
+    if action == "buy_plan":
+        days, price = payload.get("days"), payload.get("price")
+        db.log_payment(user_id, int(price), int(days), status="pending")
+        await message.answer(
+            f"Тариф на {days} дней за {price}₽.\n\n"
+            f"Пока оплата подключается вручную: напиши в поддержку с этим тарифом, "
+            f"оплати переводом — и подписка активируется в течение нескольких минут."
+        )
+        await notify_admin(
+            f"Заявка на оплату из мини-аппки: user_id={user_id}, "
+            f"тариф {days} дней за {price}₽. Подтвердить: /confirm {user_id} {days} {price}"
+        )
+    elif action == "referral":
+        bot_info = await bot.get_me()
+        link = f"https://t.me/{bot_info.username}?start=ref_{user_id}"
+        count = db.count_referrals(user_id)
+        await message.answer(f"Твоя реферальная ссылка:\n{link}\n\nУже пригласил: {count} чел.")
+    elif action == "history":
+        s = db.get_stats()
+        user = db.get_user(user_id)
+        await message.answer(f"Статус подписки: {format_time_left(user['subscription_until'])}.")
+    elif action == "support":
+        await message.answer("Напиши свой вопрос прямо в этот чат — я передам его в поддержку.")
 
 
 # --- Админ-команды ---
