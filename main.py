@@ -41,14 +41,15 @@ bot = Bot(token=config.bot_token)
 dp = Dispatcher()
 
 
-def main_menu_kb(sub_token: str | None = None):
+def main_menu_kb(sub_token: str | None = None, is_new_user: bool = False):
     kb = InlineKeyboardBuilder()
     if sub_token:
         kb.button(
             text="🐒 Открыть приложение",
             web_app=WebAppInfo(url=f"{config.sub_public_base_url}/app?token={sub_token}"),
         )
-    kb.button(text="🔑 Мой VPN", callback_data="my_key")
+    my_vpn_label = "🎉 Подключить VPN 🎉" if is_new_user else "🔑 Мой VPN"
+    kb.button(text=my_vpn_label, callback_data="my_key")
     kb.button(text="💳 Тарифы", callback_data="plans")
     kb.button(text="👥 Пригласить друга", callback_data="referral")
     kb.button(text="📱 Как подключиться", callback_data="how_to")
@@ -114,22 +115,31 @@ async def start_handler(message: Message):
         except Exception:
             pass
 
-    user = db.get_user(user_id)
+    user = db.get_user(user_id) or db.get_or_create_user(user_id, "user")
+    first_name = message.from_user.first_name or "друг"
+
     if not user["trial_used"]:
+        cheapest_price = config.plans[0][2]
         text = (
-            f"Привет! Это {config.app_name} — простой VPN прямо из Telegram.\n\n"
-            f"Тебе доступен бесплатный пробный период — {config.trial_days} дня. "
-            f"Никаких скрытых списаний: не продлишь сам — доступ просто закончится, без сюрпризов."
+            f"Привет, {first_name}! 🐒\n\n"
+            f"Подключи VPN бесплатно! Дарим тебе {config.trial_days} дня пробного периода.\n\n"
+            f"💰 от {cheapest_price}₽/мес — недорого\n"
+            f"🚀 высокая скорость, без просадок\n"
+            f"🔓 доступ ко всем сайтам и сервисам\n"
+            f"🔒 честные условия — без скрытых списаний\n\n"
+            f"👥 Приглашай друзей — тебе +{config.referral_bonus_days} дня за каждого, "
+            f"кто подключится по твоей ссылке.\n\n"
+            f"⬇️ Жми кнопку ниже!"
         )
     else:
-        text = f"С возвращением! Статус подписки: {format_time_left(user['subscription_until'])}."
+        text = f"С возвращением, {first_name}! Статус подписки: {format_time_left(user['subscription_until'])}."
 
-    await message.answer(text, reply_markup=main_menu_kb(user["sub_token"]))
+    await message.answer(text, reply_markup=main_menu_kb(user["sub_token"], is_new_user=not user["trial_used"]))
 
 
 @dp.callback_query(F.data == "back_to_menu")
 async def back_to_menu(call: CallbackQuery):
-    user = db.get_user(call.from_user.id)
+    user = db.get_user(call.from_user.id) or db.get_or_create_user(call.from_user.id, "user")
     await call.message.edit_text("Главное меню:", reply_markup=main_menu_kb(user["sub_token"] if user else None))
     await call.answer()
 
@@ -137,7 +147,7 @@ async def back_to_menu(call: CallbackQuery):
 @dp.callback_query(F.data == "my_key")
 async def my_key(call: CallbackQuery):
     user_id = call.from_user.id
-    user = db.get_user(user_id)
+    user = db.get_user(user_id) or db.get_or_create_user(user_id, call.from_user.username or call.from_user.full_name)
 
     if not user["trial_used"]:
         await call.message.edit_text("Создаю тебе доступ, секунду...")
@@ -155,7 +165,7 @@ async def my_key(call: CallbackQuery):
         db.save_vpn_client(user_id, client_uuid, server_name)
         db.mark_trial_used(user_id)
         db.extend_subscription(user_id, config.trial_days)
-        user = db.get_user(user_id)
+        user = db.get_user(user_id) or db.get_or_create_user(user_id, "user")
 
         await call.message.edit_text(
             f"Готово! Пробный период — {config.trial_days} дня.\n\n"
@@ -184,7 +194,7 @@ async def my_key(call: CallbackQuery):
 
 @dp.callback_query(F.data == "how_to")
 async def how_to(call: CallbackQuery):
-    user = db.get_user(call.from_user.id)
+    user = db.get_user(call.from_user.id) or db.get_or_create_user(call.from_user.id, "user")
     link = sub_link_for(user)
     text = (
         "Подключение за 2 шага:\n\n"
@@ -208,7 +218,7 @@ async def plans(call: CallbackQuery):
 async def buy(call: CallbackQuery):
     _, days, price = call.data.split("_")
     db.log_payment(call.from_user.id, int(price), int(days), status="pending")
-    user = db.get_user(call.from_user.id)
+    user = db.get_user(call.from_user.id) or db.get_or_create_user(call.from_user.id, "user")
     # TODO: реальная интеграция с ЮKassa/CryptoBot вместо ручного подтверждения.
     await call.message.edit_text(
         f"Тариф на {days} дней за {price}₽.\n\n"
@@ -228,7 +238,7 @@ async def referral(call: CallbackQuery):
     bot_info = await bot.get_me()
     link = f"https://t.me/{bot_info.username}?start=ref_{user_id}"
     count = db.count_referrals(user_id)
-    user = db.get_user(user_id)
+    user = db.get_user(user_id) or db.get_or_create_user(user_id, "user")
     await call.message.edit_text(
         f"Приглашай друзей — за каждого +{config.referral_bonus_days} дня подписки тебе.\n\n"
         f"Твоя ссылка:\n{link}\n\nУже пригласил: {count} чел.",
@@ -238,7 +248,7 @@ async def referral(call: CallbackQuery):
 
 @dp.callback_query(F.data == "support")
 async def support(call: CallbackQuery):
-    user = db.get_user(call.from_user.id)
+    user = db.get_user(call.from_user.id) or db.get_or_create_user(call.from_user.id, "user")
     await call.message.edit_text(
         "Напиши свой вопрос прямо в этот чат — я передам его в поддержку.",
         reply_markup=main_menu_kb(user["sub_token"]),
@@ -278,7 +288,7 @@ async def handle_webapp_data(message: Message):
         await message.answer(f"Твоя реферальная ссылка:\n{link}\n\nУже пригласил: {count} чел.")
     elif action == "history":
         s = db.get_stats()
-        user = db.get_user(user_id)
+        user = db.get_user(user_id) or db.get_or_create_user(user_id, "user")
         await message.answer(f"Статус подписки: {format_time_left(user['subscription_until'])}.")
     elif action == "support":
         await message.answer("Напиши свой вопрос прямо в этот чат — я передам его в поддержку.")
