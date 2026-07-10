@@ -41,20 +41,25 @@ bot = Bot(token=config.bot_token)
 dp = Dispatcher()
 
 
-def main_menu_kb(sub_token: str | None = None, is_new_user: bool = False):
+def main_menu_kb(sub_token: str | None = None):
     kb = InlineKeyboardBuilder()
     if sub_token:
         kb.button(
-            text="🐒 Открыть приложение",
+            text="🐒 Открыть Monkey VPN",
             web_app=WebAppInfo(url=f"{config.sub_public_base_url}/app?token={sub_token}"),
         )
-    my_vpn_label = "🎉 Подключить VPN 🎉" if is_new_user else "🔑 Мой VPN"
-    kb.button(text=my_vpn_label, callback_data="my_key")
-    kb.button(text="💳 Тарифы", callback_data="plans")
     kb.button(text="👥 Пригласить друга", callback_data="referral")
     kb.button(text="📱 Как подключиться", callback_data="how_to")
     kb.button(text="🆘 Поддержка", callback_data="support")
     kb.adjust(1)
+    return kb.as_markup()
+
+
+def back_kb():
+    """Простая клавиатура с одной кнопкой назад — используется во всех подменю,
+    чтобы не дублировать полное меню там, где оно не нужно."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="⬅️ Назад", callback_data="back_to_menu")
     return kb.as_markup()
 
 
@@ -134,7 +139,7 @@ async def start_handler(message: Message):
     else:
         text = f"С возвращением, {first_name}! Статус подписки: {format_time_left(user['subscription_until'])}."
 
-    await message.answer(text, reply_markup=main_menu_kb(user["sub_token"], is_new_user=not user["trial_used"]))
+    await message.answer(text, reply_markup=main_menu_kb(user["sub_token"]))
 
 
 @dp.callback_query(F.data == "back_to_menu")
@@ -156,7 +161,7 @@ async def my_key(call: CallbackQuery):
             await call.message.edit_text(
                 "Не получилось создать доступ — сервер временно недоступен. "
                 "Попробуй через пару минут, я уже знаю о проблеме.",
-                reply_markup=main_menu_kb(user["sub_token"]),
+                reply_markup=back_kb(),
             )
             await notify_admin(f"create_vpn_client вернул None для user_id={user_id}")
             return
@@ -173,7 +178,7 @@ async def my_key(call: CallbackQuery):
             f"`{sub_link_for(user)}`\n\n"
             f"Как подключиться — жми кнопку «Как подключиться» в меню.",
             parse_mode="Markdown",
-            reply_markup=main_menu_kb(user["sub_token"]),
+            reply_markup=back_kb(),
         )
         return
 
@@ -188,7 +193,7 @@ async def my_key(call: CallbackQuery):
         f"Твоя ссылка подписки:\n`{sub_link_for(user)}`\n\n"
         f"Статус: {format_time_left(user['subscription_until'])}.",
         parse_mode="Markdown",
-        reply_markup=main_menu_kb(user["sub_token"]),
+        reply_markup=back_kb(),
     )
 
 
@@ -206,7 +211,7 @@ async def how_to(call: CallbackQuery):
         "После этого просто нажимай «Подключить» в приложении — обновлять ссылку вручную "
         "не нужно, она обновляется сама."
     )
-    await call.message.edit_text(text, parse_mode="Markdown", reply_markup=main_menu_kb(user["sub_token"]))
+    await call.message.edit_text(text, parse_mode="Markdown", reply_markup=back_kb())
 
 
 @dp.callback_query(F.data == "plans")
@@ -224,7 +229,7 @@ async def buy(call: CallbackQuery):
         f"Тариф на {days} дней за {price}₽.\n\n"
         f"Пока оплата подключается вручную: напиши в поддержку с этим тарифом, "
         f"оплати переводом — и подписка активируется в течение нескольких минут.",
-        reply_markup=main_menu_kb(user["sub_token"]),
+        reply_markup=back_kb(),
     )
     await notify_admin(
         f"Новая заявка на оплату: user_id={call.from_user.id}, "
@@ -242,7 +247,7 @@ async def referral(call: CallbackQuery):
     await call.message.edit_text(
         f"Приглашай друзей — за каждого +{config.referral_bonus_days} дня подписки тебе.\n\n"
         f"Твоя ссылка:\n{link}\n\nУже пригласил: {count} чел.",
-        reply_markup=main_menu_kb(user["sub_token"]),
+        reply_markup=back_kb(),
     )
 
 
@@ -251,7 +256,7 @@ async def support(call: CallbackQuery):
     user = db.get_user(call.from_user.id) or db.get_or_create_user(call.from_user.id, "user")
     await call.message.edit_text(
         "Напиши свой вопрос прямо в этот чат — я передам его в поддержку.",
-        reply_markup=main_menu_kb(user["sub_token"]),
+        reply_markup=back_kb(),
     )
 
 
