@@ -3,338 +3,1406 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>VPN Monkey</title>
+<title>Monkey VPN</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #14161a;
-    --surface: #1c1f24;
-    --surface-2: #23272d;
-    --border: #2b2f36;
-    --green: #3ddc6a;
-    --green-dim: #1f6b3a;
-    --green-text-on: #06210f;
-    --text-primary: #eef2f0;
-    --text-secondary: #9aa39d;
-    --text-muted: #6b7169;
-    --danger: #ff6b6b;
-    --radius: 16px;
+    --mint: #7fee64;
+    --mint-soft: #b9ffaa;
+    --bg: #0e0e0e;
+    --card: #191919;
+    --card-2: #222326;
+    --card-3: #2c2c2c;
+    --line: #414042;
+    --text: #ffffff;
+    --muted: #a7a9ac;
+    --blue: #7fee64;
+    --blue-soft: #191919;
+    --danger: #ff5c74;
+    --danger-soft: #201114;
+    --warning: #7fee64;
+    --success: #7fee64;
+    --radius: 14px;
+    --pill: 999px;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
   }
+
   * { box-sizing: border-box; }
-  body {
+
+  html, body {
     margin: 0;
+    min-height: 100dvh;
     background: var(--bg);
-    color: var(--text-primary);
-    font-family: 'Inter', sans-serif;
+    color: var(--text);
+    font-family: "Inter", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 480px; margin: 0 auto; padding: 20px 16px 32px; }
 
-  .header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
-  .header .logo {
-    width: 36px; height: 36px; border-radius: 10px;
-    background: var(--green-dim);
-    display: flex; align-items: center; justify-content: center;
+  button, input, textarea, select { font: inherit; }
+
+  .intro-splash {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background:
+      radial-gradient(circle at center, rgba(127, 238, 100, 0.18), transparent 34%),
+      #0e0e0e;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: scale(1);
+  }
+
+  .intro-logo {
+    font-size: clamp(34px, 10vw, 56px);
+    line-height: 0.95;
+    font-weight: 700;
+    letter-spacing: -0.05em;
+    color: #ffffff;
+    text-align: center;
+    text-shadow: 0 0 28px rgba(127, 238, 100, 0.18);
+    transform-origin: center;
+    will-change: transform, opacity, filter;
+  }
+
+  .intro-logo span {
+    display: block;
+    color: #7fee64;
+  }
+
+  body.intro-play .intro-splash {
+    animation: introSplash 1060ms cubic-bezier(0.2, 0.9, 0.18, 1) forwards, introBassPulse 470ms cubic-bezier(0.18, 1, 0.32, 1) 250ms 1;
+  }
+
+  .app {
+    max-width: 520px;
+    margin: 0 auto;
+    min-height: 100dvh;
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+
+  .screen {
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  .screen > * {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  body.app-ready .app {
+    animation: appReveal 620ms var(--ease) forwards;
+  }
+
+  body.app-ready .screen:not(.hidden) > * {
+    animation: entranceRise 560ms var(--ease) forwards;
+  }
+
+  body.app-ready .screen:not(.hidden) > *:nth-child(1) { animation-delay: 40ms; }
+  body.app-ready .screen:not(.hidden) > *:nth-child(2) { animation-delay: 110ms; }
+  body.app-ready .screen:not(.hidden) > *:nth-child(3) { animation-delay: 180ms; }
+  body.app-ready .screen:not(.hidden) > *:nth-child(4) { animation-delay: 250ms; }
+  body.app-ready .screen:not(.hidden) > *:nth-child(5) { animation-delay: 320ms; }
+  body.app-ready .screen:not(.hidden) > *:nth-child(6) { animation-delay: 390ms; }
+
+  .screen.hidden {
+    display: none;
+  }
+
+  .topbar,
+  .balance-panel,
+  .panel,
+  .device-card,
+  .tile,
+  .plan,
+  .section-card {
+    background: var(--card);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: var(--radius);
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: #191919;
+    color: #7fee64;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 12px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+
+  .brand-title {
+    font-size: 17px;
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: -0.016em;
+  }
+
+  .brand-sub,
+  .balance-label,
+  .device-subtitle,
+  .section-label,
+  .tile-kicker,
+  .plan-note,
+  .helper-text,
+  .download-subtitle {
+    color: var(--muted);
+  }
+
+  .brand-sub,
+  .balance-label,
+  .tile-kicker,
+  .plan-note,
+  .helper-text,
+  .device-subtitle,
+  .download-subtitle {
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .balance-box {
+    text-align: right;
+  }
+
+  .balance-value {
+    margin-top: 2px;
+    font-size: 17px;
+    line-height: 1.2;
+    font-weight: 600;
+    color: #7fee64;
+  }
+
+  .balance-value.low {
+    color: #ff7701;
+  }
+
+  .balance-panel {
+    padding: 18px 14px 14px;
+    text-align: center;
+    background:
+      radial-gradient(circle at top, rgba(127, 238, 100, 0.16), transparent 58%),
+      #191919;
+    animation: fadeUp 520ms var(--ease);
+  }
+
+  .balance-panel-title {
+    font-size: 17px;
+    line-height: 1.29;
+    font-weight: 600;
+    letter-spacing: -0.016em;
+  }
+
+  .balance-panel-value {
+    margin-top: 10px;
+    font-size: clamp(48px, 13vw, 64px);
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: -0.05em;
+    color: #ffffff;
+  }
+
+  .balance-panel-value span {
+    color: rgba(255, 255, 255, 0.38);
+  }
+
+  .balance-panel-hint {
+    margin-top: 10px;
+    font-size: 15px;
+    line-height: 1.35;
+    color: #7fee64;
+  }
+
+  .balance-panel-hint.low {
+    color: #ff7701;
+  }
+
+  .balance-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .balance-action,
+  .device-add-btn,
+  .primary-btn,
+  .secondary-btn,
+  .copy-btn,
+  .download-btn,
+  .danger-btn,
+  .tile,
+  .plan,
+  .device-card {
+    transition: transform 200ms var(--ease), background-color 200ms var(--ease), border-color 200ms var(--ease), color 200ms var(--ease);
+  }
+
+  .balance-action,
+  .device-add-btn,
+  .download-btn {
+    appearance: none;
+    width: 100%;
+    border: 0;
+    border-radius: 12px;
+    padding: 14px 12px 12px;
+    background: #191919;
+    color: #d1d3d4;
+    border: 1px solid rgba(127, 238, 100, 0.22);
+    cursor: pointer;
+  }
+
+  .balance-action:active,
+  .device-add-btn:active,
+  .primary-btn:active,
+  .secondary-btn:active,
+  .copy-btn:active,
+  .download-btn:active,
+  .danger-btn:active,
+  .tile:active,
+  .plan:active,
+  .device-card:active {
+    transform: scale(0.97);
+  }
+
+  .balance-action-icon {
+    width: 28px;
+    height: 28px;
+    margin: 0 auto 10px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--blue);
+    color: #ffffff;
     font-size: 18px;
+    font-weight: 700;
   }
-  .header .title {
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 700; font-size: 18px; letter-spacing: 0.2px;
-  }
-  .header .sub { font-size: 12px; color: var(--text-muted); margin-top: -2px; }
 
-  .status-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 24px 20px;
-    display: flex; align-items: center; gap: 20px;
-    margin-bottom: 14px;
+  .balance-action-label,
+  .device-add-btn,
+  .download-btn {
+    font-size: 15px;
+    line-height: 1.35;
+    font-weight: 600;
   }
-  .ring-wrap { position: relative; width: 92px; height: 92px; flex-shrink: 0; }
-  .ring-wrap svg { transform: rotate(-90deg); }
-  .ring-bg { fill: none; stroke: var(--surface-2); stroke-width: 8; }
-  .ring-fg { fill: none; stroke: var(--green); stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
-  .ring-center {
-    position: absolute; inset: 0; display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-  }
-  .ring-center .num { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 22px; line-height: 1; }
-  .ring-center .lbl { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 
-  .status-info { flex: 1; min-width: 0; }
+  .device-card {
+    appearance: none;
+    width: 100%;
+    text-align: left;
+    padding: 18px 16px 14px;
+    cursor: pointer;
+    color: #ffffff;
+    background:
+      radial-gradient(circle at top right, rgba(127, 238, 100, 0.12), transparent 40%),
+      #191919;
+  }
+
+  .device-card-head {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .device-card-title {
+    font-size: 17px;
+    line-height: 1.29;
+    font-weight: 600;
+    color: #ffffff;
+  }
+
+  .device-add-btn {
+    width: auto;
+    min-width: 108px;
+    padding: 10px 14px;
+    border-radius: var(--pill);
+    background: #191919;
+    color: #ffffff;
+  }
+
+  .device-row {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 14px 12px;
+    border-radius: 12px;
+    background: #222326;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .device-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: var(--blue);
+    color: white;
+    font-size: 26px;
+    line-height: 1;
+  }
+
+  .device-name {
+    font-size: 17px;
+    line-height: 1.29;
+    font-weight: 600;
+    letter-spacing: -0.016em;
+    color: #ffffff;
+  }
+
+  .device-date {
+    align-self: end;
+    font-size: 14px;
+    line-height: 18px;
+    color: #ffffff;
+  }
+
+  .panel {
+    padding: 14px;
+  }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .panel-title {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.016em;
+  }
+
   .status-pill {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: var(--green-dim); color: var(--green);
-    font-size: 12px; font-weight: 500; padding: 4px 10px;
-    border-radius: 100px; margin-bottom: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 30px;
+    padding: 0 12px;
+    border-radius: 36px;
+    background: #191919;
+    border: 1px solid rgba(127, 238, 100, 0.18);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--warning);
+    white-space: nowrap;
   }
-  .status-pill.expired { background: #3a1f22; color: var(--danger); }
-  .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-  .status-info .desc { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
 
-  .link-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px 18px;
-    margin-bottom: 14px;
+  .status-pill::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
   }
-  .link-card .label {
-    font-size: 12px; color: var(--text-muted); margin-bottom: 8px;
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .link-row {
-    display: flex; align-items: center; gap: 8px;
-    background: var(--surface-2); border-radius: 10px; padding: 10px 12px;
-  }
-  .link-row .link-text {
-    flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 12px;
-    color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .copy-btn {
-    background: var(--green); color: var(--green-text-on);
-    border: none; border-radius: 8px; padding: 8px 14px;
-    font-family: 'Inter', sans-serif; font-weight: 600; font-size: 12px;
-    cursor: pointer; flex-shrink: 0; transition: transform 0.15s ease;
-  }
-  .copy-btn:active { transform: scale(0.95); }
-  .copy-btn.copied { background: var(--surface-2); color: var(--green); }
 
-  .steps { margin-top: 14px; }
-  .steps summary {
-    cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-secondary);
-    list-style: none; display: flex; align-items: center; justify-content: space-between;
-  }
-  .steps summary::-webkit-details-marker { display: none; }
-  .steps summary .chevron { transition: transform 0.2s ease; color: var(--text-muted); }
-  .steps[open] summary .chevron { transform: rotate(180deg); }
-  .steps .step-list { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
-  .step-item { display: flex; gap: 10px; font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.5; }
-  .step-item .num {
-    flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%;
-    background: var(--surface-2); color: var(--green);
-    font-size: 11px; font-weight: 600;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .step-item b { color: var(--text-primary); }
+  .status-pill.active { color: var(--mint); }
+  .status-pill.expired { color: var(--danger); }
 
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-  .action-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 16px; text-align: left; cursor: pointer; transition: border-color 0.15s ease;
+  .sub-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
   }
-  .action-card:active { border-color: var(--green-dim); }
-  .action-card .icon { font-size: 20px; margin-bottom: 8px; display: block; }
-  .action-card .name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
-  .action-card .hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
-  .plans { display: none; margin-bottom: 14px; }
-  .plans.open { display: block; }
-  .plan-row {
-    display: flex; align-items: center; justify-content: space-between;
-    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-    padding: 14px 16px; margin-bottom: 8px; cursor: pointer;
+  .sub-link,
+  .link-value,
+  .input-like {
+    min-width: 0;
+    padding: 13px 14px;
+    border-radius: 12px;
+    background: #191919;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--muted);
+    border: 1px solid rgba(255, 255, 255, 0.06);
   }
-  .plan-row.featured { border-color: var(--green-dim); }
-  .plan-row .p-name { font-size: 14px; font-weight: 500; }
-  .plan-row .p-badge { font-size: 10px; color: var(--green); margin-top: 2px; }
-  .plan-row .p-price { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 15px; }
 
+  .sub-link {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .copy-btn,
+  .primary-btn,
+  .secondary-btn,
+  .danger-btn {
+    appearance: none;
+    width: 100%;
+    min-height: 50px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 0;
+    cursor: pointer;
+    font-size: 17px;
+    line-height: 22px;
+    font-weight: 600;
+  }
+
+  .copy-btn,
   .primary-btn {
-    width: 100%; background: var(--green); color: var(--green-text-on);
-    border: none; border-radius: 12px; padding: 15px; font-size: 14px;
-    font-weight: 600; font-family: 'Inter', sans-serif; cursor: pointer; margin-bottom: 10px;
+    background: linear-gradient(179deg, #62d84f 1.06%, #7fee64 123.42%);
+    color: white;
+    box-shadow: 0 0 0 1px rgba(127, 238, 100, 0.1), 0 12px 28px rgba(127, 238, 100, 0.2);
   }
-  .primary-btn:active { transform: scale(0.99); }
+
+  .secondary-btn {
+    background: #191919;
+    color: #ffffff;
+    border: 1px solid rgba(127, 238, 100, 0.2);
+  }
+
+  .tile,
+  .plan,
+  .section-card,
+  .section-card.alt,
+  .tile.alt,
+  .plan.alt,
+  .device-row,
+  .download-row {
+    background: #222326;
+  }
+
+  .danger-btn {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+
+  .grid,
+  .plans {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .tile,
+  .plan {
+    appearance: none;
+    width: 100%;
+    border: 0;
+    padding: 16px;
+    min-height: 102px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    text-align: left;
+    cursor: pointer;
+    color: var(--text);
+  }
+
+  .tile.alt,
+  .plan.alt,
+  .section-card.alt {
+    background: #222326;
+  }
+
+  .tile-kicker,
+  .section-label {
+    margin-bottom: 12px;
+  }
+
+  .tile-title,
+  .plan-title,
+  .section-title {
+    font-size: 21px;
+    line-height: 1.24;
+    font-weight: 600;
+    letter-spacing: -0.105px;
+  }
+
+  .tile-copy,
+  .section-copy {
+    margin-top: 4px;
+    font-size: 14px;
+    line-height: 1.29;
+    color: var(--muted);
+  }
+
+  .referral-tile {
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at top right, rgba(127, 238, 100, 0.12), transparent 44%),
+      #222326;
+  }
+
+  .referral-tile::after {
+    content: "";
+    position: absolute;
+    inset: auto 16px 0 16px;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(127, 238, 100, 0), rgba(127, 238, 100, 0.45), rgba(127, 238, 100, 0));
+  }
+
+  .referral-title {
+    max-width: 180px;
+    font-size: 19px;
+    line-height: 1.18;
+  }
+
+  .referral-accent {
+    display: inline-block;
+    width: fit-content;
+    margin-top: auto;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(127, 238, 100, 0.12);
+    color: #7fee64;
+    font-size: 15px;
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .plans {
+    display: none;
+  }
+
+  .plans.open {
+    display: grid;
+    animation: fadeUp 260ms var(--ease);
+  }
+
+  .plan-price {
+    margin-top: 8px;
+    font-size: 17px;
+    font-weight: 600;
+    color: #ffffff;
+  }
+
+  .feedback {
+    display: none;
+    margin-top: 10px;
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .feedback.show { display: block; }
+  .feedback.success { color: #7fee64; }
+  .feedback.error { color: var(--danger); }
+
+  .toast {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    z-index: 30;
+    min-width: 180px;
+    max-width: calc(100vw - 32px);
+    padding: 12px 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(127, 238, 100, 0.42);
+    background: linear-gradient(180deg, rgba(30, 44, 27, 0.98), rgba(22, 22, 22, 0.96));
+    color: #f5fff2;
+    font-size: 14px;
+    line-height: 1.2;
+    font-weight: 600;
+    text-align: center;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34), 0 0 22px rgba(127, 238, 100, 0.22);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -18px) scale(0.96);
+  }
+
+  .toast.show {
+    animation: toastInOut 2200ms var(--ease) forwards;
+  }
+
+  .device-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 4px 0 10px;
+  }
+
+  .back-btn {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: #7fee64;
+    font-size: 17px;
+    line-height: 22px;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .device-balance {
+    text-align: right;
+    font-size: 14px;
+    line-height: 18px;
+  }
+
+  .device-balance strong {
+    display: block;
+    margin-top: 2px;
+    font-size: 17px;
+    color: white;
+  }
+
+  .device-hero {
+    text-align: center;
+    padding: 18px 10px 10px;
+  }
+
+  .device-hero-icon {
+    font-size: 56px;
+    line-height: 1;
+    margin-bottom: 18px;
+  }
+
+  .device-hero-title {
+    font-size: 23px;
+    line-height: 1.24;
+    font-weight: 700;
+  }
+
+  .device-hero-subtitle {
+    margin-top: 4px;
+    font-size: 17px;
+    line-height: 22px;
+    font-weight: 600;
+  }
+
+  .section-card {
+    padding: 16px;
+  }
+
+  .input-like {
+    margin-top: 8px;
+    width: 100%;
+    color: var(--muted);
+  }
+
+  .manage-card {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+  }
+
+  .manage-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+  }
+
+  .manage-icon.orange {
+    background: #ff9f1a;
+  }
+
+  .manage-icon.green {
+    background: linear-gradient(179deg, #62d84f 1.06%, #7fee64 123.42%);
+  }
+
+  .manage-icon.red {
+    background: #ff4f6d;
+  }
+
+  .download-row {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 14px;
+    border-radius: 12px;
+    background: var(--card-2);
+  }
+
+  .download-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: #191919;
+    font-size: 28px;
+  }
+
+  .download-title {
+    font-size: 17px;
+    line-height: 22px;
+    font-weight: 600;
+  }
+
+  .download-btn {
+    width: auto;
+    min-width: 98px;
+    padding: 12px 16px;
+    border-radius: var(--pill);
+  }
+
+  .accordion-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    cursor: pointer;
+  }
+
+  .accordion-arrow {
+    color: var(--muted);
+  }
+
+  .loading .helper-text,
+  .loading .sub-link {
+    visibility: hidden;
+  }
+
+  .loading .helper-wrap,
+  .loading .sub-link-wrap {
+    position: relative;
+  }
+
+  .loading .helper-wrap::after,
+  .loading .sub-link-wrap::after {
+    content: "";
+    display: block;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #111714 0%, #1b2620 50%, #111714 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+  }
+
+  .loading .helper-wrap::after {
+    height: 38px;
+  }
+
+  .loading .sub-link-wrap::after {
+    height: 42px;
+  }
+
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes introSplash {
+    0% {
+      opacity: 0;
+      visibility: visible;
+      transform: scale(1.08);
+    }
+    10% {
+      opacity: 1;
+      visibility: visible;
+      transform: scale(1);
+    }
+    26% {
+      opacity: 1;
+      visibility: visible;
+    }
+    60% {
+      opacity: 1;
+      visibility: visible;
+    }
+    100% {
+      opacity: 0;
+      visibility: hidden;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes introLogoFly {
+    0% {
+      opacity: 0;
+      transform: translateY(80px) scale(0.46);
+      letter-spacing: -0.14em;
+      filter: blur(18px);
+    }
+    34% {
+      opacity: 1;
+      transform: translateY(-6px) scale(1.18);
+      letter-spacing: -0.045em;
+      filter: blur(0);
+    }
+    46% {
+      opacity: 1;
+      transform: translateY(0) scale(0.96);
+      letter-spacing: -0.05em;
+      filter: blur(0);
+    }
+    58% {
+      opacity: 1;
+      transform: translateY(0) scale(1.03);
+      filter: blur(0);
+    }
+    72% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-18px) scale(1.08);
+      filter: blur(10px);
+    }
+  }
+
+  @keyframes introBassPulse {
+    0% {
+      box-shadow: inset 0 0 0 rgba(127, 238, 100, 0);
+    }
+    48% {
+      box-shadow: inset 0 0 180px rgba(127, 238, 100, 0.18);
+    }
+    100% {
+      box-shadow: inset 0 0 0 rgba(127, 238, 100, 0);
+    }
+  }
+
+  body.intro-play .intro-logo {
+    animation: introLogoFly 900ms cubic-bezier(0.18, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes appReveal {
+    from {
+      opacity: 0;
+      transform: translateY(18px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes entranceRise {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+  }
+
+  @keyframes toastInOut {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -18px) scale(0.96);
+    }
+    12% {
+      opacity: 1;
+      transform: translate(-50%, 0) scale(1);
+    }
+    82% {
+      opacity: 1;
+      transform: translate(-50%, 0) scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: translate(-50%, -10px) scale(0.98);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-
-  <div class="header">
-    <div class="logo">🐒</div>
-    <div>
-      <div class="title">VPN Monkey</div>
-      <div class="sub" id="username-line">с возвращением</div>
-    </div>
-  </div>
-
-  <div class="status-card">
-    <div class="ring-wrap">
-      <svg width="92" height="92" viewBox="0 0 92 92">
-        <circle class="ring-bg" cx="46" cy="46" r="40"></circle>
-        <circle class="ring-fg" id="ring-progress" cx="46" cy="46" r="40"
-          stroke-dasharray="251" stroke-dashoffset="70"></circle>
-      </svg>
-      <div class="ring-center">
-        <div class="num" id="days-num">2</div>
-        <div class="lbl">дня</div>
-      </div>
-    </div>
-    <div class="status-info">
-      <div class="status-pill">
-        <span class="dot"></span>
-        <span>Пробный период</span>
-      </div>
-      <div class="desc">Осталось 2 дня бесплатного доступа. Продли подписку, чтобы не потерять соединение.</div>
-    </div>
-  </div>
-
-  <div class="link-card">
-    <div class="label">
-      <span>Ссылка подписки</span>
-      <span style="color: var(--text-muted);">вставь один раз</span>
-    </div>
-    <div class="link-row">
-      <span class="link-text" id="sub-link">https://vpnmonkey.app/sub/a8f2c91b3e...</span>
-      <button class="copy-btn" id="copy-btn" onclick="copyLink()">Копировать</button>
-    </div>
-
-    <details class="steps">
-      <summary>
-        <span>Как подключиться</span>
-        <span class="chevron">⌄</span>
-      </summary>
-      <div class="step-list">
-        <div class="step-item">
-          <span class="num">1</span>
-          <span>Установи <b>v2rayNG</b> (Android) или <b>Hiddify / Happ</b> (iPhone, Mac, Windows)</span>
-        </div>
-        <div class="step-item">
-          <span class="num">2</span>
-          <span>В приложении выбери <b>«Добавить подписку по ссылке»</b> и вставь скопированную ссылку</span>
-        </div>
-        <div class="step-item">
-          <span class="num">3</span>
-          <span>Нажми <b>«Подключить»</b> — дальше ссылка обновляется сама, руками ничего менять не нужно</span>
+<div class="intro-splash" aria-hidden="true">
+  <div class="intro-logo">Monkey<span>VPN</span></div>
+</div>
+<div class="toast" id="toast">Ссылка скопирована.</div>
+<div class="app">
+  <div class="screen" id="home-screen">
+    <div class="topbar">
+      <div class="brand">
+        <div class="mark">VM</div>
+        <div>
+          <div class="brand-title">Monkey VPN</div>
+          <div class="brand-sub" id="username-line">Добро пожаловать</div>
         </div>
       </div>
-    </details>
+      <div class="balance-box">
+        <div class="balance-label">Баланс</div>
+        <div class="balance-value" id="balance-amount">0 ₽</div>
+      </div>
+    </div>
+
+    <div class="balance-panel">
+      <div class="balance-panel-title">Баланс</div>
+      <div class="balance-panel-value"><span id="balance-main-amount">0</span> <span>₽</span></div>
+      <div class="balance-panel-hint" id="balance-days-hint">Хватит на ~0 дней</div>
+      <div class="balance-actions">
+        <button class="balance-action" type="button" onclick="sendToBot('top_up_balance')">
+          <div class="balance-action-icon">+</div>
+          <div class="balance-action-label">Пополнить</div>
+        </button>
+        <button class="balance-action" type="button" onclick="sendToBot('history')">
+          <div class="balance-action-icon">↻</div>
+          <div class="balance-action-label">История</div>
+        </button>
+      </div>
+    </div>
+
+    <button class="device-card" type="button" onclick="openDeviceSettings()">
+      <div class="device-card-head">
+        <div>
+          <div class="device-card-title">Мое устройство</div>
+          <div class="device-subtitle">Подключено: 1</div>
+        </div>
+        <div class="device-add-btn">Добавить</div>
+      </div>
+      <div class="device-row">
+        <div class="device-icon"></div>
+        <div class="device-name" id="device-card-name">V140226851 (iPhone/iPad)</div>
+        <div class="device-date" id="device-card-date">26.06.26</div>
+      </div>
+    </button>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-title">Статус подписки</div>
+        <div class="status-pill" id="status-pill">Пробный период</div>
+      </div>
+      <div class="sub-row">
+        <div class="sub-link-wrap" style="min-width:0;">
+          <div class="sub-link" id="sub-link">https://vpnmonkey.app/sub/a8f2c91b3e...</div>
+        </div>
+        <button class="copy-btn" type="button" id="copy-btn" onclick="copyHomeLink()">Копировать</button>
+      </div>
+      <div class="feedback" id="feedback"></div>
+    </div>
+
+    <div class="grid">
+      <button class="tile referral-tile" type="button" onclick="copyReferralLink()">
+        <div class="tile-title referral-title">Пригласи друга</div>
+        <div class="referral-accent">+50 ₽</div>
+      </button>
+      <button class="tile alt support-tile" type="button" onclick="sendToBot('support')">
+        <div class="tile-title">Помощь</div>
+        <div class="tile-copy">если что-то непонятно</div>
+      </button>
+    </div>
+
+    <div class="plans" id="plans-block">
+      <button class="plan" type="button" onclick="buyPlan(30, 100)">
+        <div class="plan-title">1 месяц</div>
+        <div class="plan-price">100 ₽</div>
+      </button>
+      <button class="plan alt" type="button" onclick="buyPlan(90, 300)">
+        <div class="plan-title">3 месяца</div>
+        <div class="plan-price">300 ₽</div>
+      </button>
+      <button class="plan" type="button" onclick="buyPlan(180, 600)">
+        <div class="plan-title">6 месяцев</div>
+        <div class="plan-price">600 ₽</div>
+      </button>
+      <button class="plan alt" type="button" onclick="buyPlan(365, 1200)">
+        <div class="plan-title">12 месяцев</div>
+        <div class="plan-price">1200 ₽</div>
+        <div class="plan-note">100 ₽ в месяц</div>
+      </button>
+    </div>
   </div>
 
-  <div class="grid">
-    <div class="action-card" onclick="togglePlans()">
-      <span class="icon">💳</span>
-      <div class="name">Тарифы</div>
-      <div class="hint">от 99₽/мес</div>
+  <div class="screen hidden" id="device-screen">
+    <div class="topbar" style="padding: 10px 14px;">
+      <button class="back-btn" type="button" onclick="closeDeviceSettings()">← Назад</button>
+      <div class="device-balance">
+        Баланс
+        <strong id="device-balance-amount">0 ₽</strong>
+      </div>
     </div>
-    <div class="action-card" onclick="sendToBot('referral')">
-      <span class="icon">👥</span>
-      <div class="name">Пригласить</div>
-      <div class="hint">+2 дня за друга</div>
+
+    <div class="device-hero">
+      <div class="device-hero-icon">🔗</div>
+      <div class="device-hero-title">Настройки устройства</div>
+      <div class="device-hero-subtitle" id="device-detail-title">140226851 Vless (iPhone/iPad)</div>
     </div>
-    <div class="action-card" onclick="sendToBot('history')">
-      <span class="icon">📊</span>
-      <div class="name">История</div>
-      <div class="hint">платежи и дни</div>
+
+    <div class="section-card alt">
+      <div class="section-label">НАЗВАНИЕ УСТРОЙСТВА</div>
+      <input class="input-like" id="device-name-input" value="Мой iPhone" />
     </div>
-    <div class="action-card" onclick="sendToBot('support')">
-      <span class="icon">🆘</span>
-      <div class="name">Поддержка</div>
-      <div class="hint">написать нам</div>
+
+    <div class="section-card">
+      <div class="section-label">УПРАВЛЕНИЕ УСТРОЙСТВОМ</div>
+      <div class="manage-card">
+        <div class="manage-icon orange">⛔</div>
+        <div>
+          <div class="section-title" style="font-size:18px;">Перестал работать VPN?</div>
+          <div class="section-copy">Попробуйте заменить настройки устройства</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;">
+        <button class="primary-btn" type="button" onclick="sendToBot('replace_device')">Заменить</button>
+      </div>
+    </div>
+
+    <div class="section-card alt">
+      <div class="section-label">ССЫЛКА ДЛЯ НАСТРОЙКИ</div>
+      <div class="manage-card">
+        <div class="manage-icon green">🔗</div>
+        <div class="section-copy" style="margin-top:0;">
+          Скопируйте эту ссылку и вставьте ее в приложение HitWave или HitProxy/HitVPN. Требуется версия не ниже 1.6.
+        </div>
+      </div>
+      <div style="margin-top:14px;">
+        <div class="link-value" id="device-config-link">https://hvpn.io/ATxZgKFyUQQ-41vA8rd4ihwly...</div>
+      </div>
+      <div style="margin-top:14px;">
+        <button class="secondary-btn" type="button" onclick="copyDeviceLink()">Скопировать ссылку</button>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="manage-card">
+        <div class="manage-icon red">!</div>
+        <div>
+          <div class="section-title" style="font-size:18px;">Если вы не используете настройки VPN данного устройства</div>
+          <div class="section-copy">Удалите его, чтобы не расходовать баланс</div>
+        </div>
+      </div>
+      <div style="margin-top:14px;">
+        <button class="danger-btn" type="button" onclick="sendToBot('delete_device')">Удалить</button>
+      </div>
+    </div>
+
+    <div class="section-card alt">
+      <div class="section-label">СКАЧАЙТЕ ПРИЛОЖЕНИЕ HITWAVE</div>
+      <div class="download-row">
+        <div class="download-icon"></div>
+        <div>
+          <div class="download-title">App Store</div>
+          <div class="download-subtitle">iOS</div>
+        </div>
+        <button class="download-btn" type="button" onclick="sendToBot('download_hitwave_ios')">Скачать</button>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="accordion-head">
+        <div class="section-title" style="font-size:18px;">Инструкция для iOS</div>
+        <div class="accordion-arrow">⌄</div>
+      </div>
     </div>
   </div>
-
-  <div class="plans" id="plans-block">
-    <div class="plan-row" onclick="buyPlan(30, 99)">
-      <div><div class="p-name">1 месяц</div></div>
-      <div class="p-price">99₽</div>
-    </div>
-    <div class="plan-row featured" onclick="buyPlan(90, 249)">
-      <div><div class="p-name">3 месяца</div><div class="p-badge">выгоднее на 16%</div></div>
-      <div class="p-price">249₽</div>
-    </div>
-    <div class="plan-row" onclick="buyPlan(180, 449)">
-      <div><div class="p-name">6 месяцев</div></div>
-      <div class="p-price">449₽</div>
-    </div>
-    <div class="plan-row" onclick="buyPlan(365, 799)">
-      <div><div class="p-name">12 месяцев</div><div class="p-badge">выгоднее на 33%</div></div>
-      <div class="p-price">799₽</div>
-    </div>
-  </div>
-
 </div>
 
 <script>
   const tg = window.Telegram ? window.Telegram.WebApp : null;
-  const urlParams = new URLSearchParams(window.location.search);
-  const token = urlParams.get('token');
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("token");
+  const BOT_USERNAME = "monkeyvpnbot";
+  const TRIAL_TOTAL_DAYS = 3;
+  const RING = 251;
+
+  const homeScreen = document.getElementById("home-screen");
+  const deviceScreen = document.getElementById("device-screen");
+  const statusPill = document.getElementById("status-pill");
+  const subLink = document.getElementById("sub-link");
+  const feedback = document.getElementById("feedback");
+  const copyBtn = document.getElementById("copy-btn");
+  const plansBlock = document.getElementById("plans-block");
+  const balanceAmount = document.getElementById("balance-amount");
+  const balanceMainAmount = document.getElementById("balance-main-amount");
+  const balanceDaysHint = document.getElementById("balance-days-hint");
+  const deviceBalanceAmount = document.getElementById("device-balance-amount");
+  const deviceCardName = document.getElementById("device-card-name");
+  const deviceCardDate = document.getElementById("device-card-date");
+  const deviceDetailTitle = document.getElementById("device-detail-title");
+  const deviceNameInput = document.getElementById("device-name-input");
+  const deviceConfigLink = document.getElementById("device-config-link");
+  const ringFill = document.getElementById("ring-fill");
+  const toast = document.getElementById("toast");
+  const currentUser = tg && tg.initDataUnsafe ? tg.initDataUnsafe.user : null;
+  let toastTimer = null;
 
   if (tg) {
     tg.ready();
     tg.expand();
-    const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
-    if (user && user.first_name) {
-      document.getElementById('username-line').textContent = 'привет, ' + user.first_name;
+    if (currentUser && currentUser.first_name) {
+      document.getElementById("username-line").textContent = "Привет, " + currentUser.first_name;
     }
   }
 
-  const TRIAL_TOTAL_DAYS = 3; // используется только для расчета процента кольца на триале
+  function daysWord(value) {
+    const mod10 = value % 10;
+    const mod100 = value % 100;
+    if (mod10 === 1 && mod100 !== 11) return "день";
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "дня";
+    return "дней";
+  }
+
+  function setFeedback(type, text) {
+    feedback.className = "feedback show " + type;
+    feedback.textContent = text;
+  }
+
+  function clearFeedback() {
+    feedback.className = "feedback";
+    feedback.textContent = "";
+  }
+
+  function showToast(message) {
+    toast.textContent = message;
+    toast.classList.remove("show");
+    void toast.offsetWidth;
+    toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      toast.classList.remove("show");
+    }, 2200);
+  }
+
+  function getLocalReferralSeed() {
+    const key = "monkey_vpn_ref_seed";
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+    const created = "guest" + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem(key, created);
+    return created;
+  }
+
+  function buildReferralLink() {
+    const rawId = currentUser && currentUser.id
+      ? String(currentUser.id)
+      : token
+        ? token
+        : getLocalReferralSeed();
+    const sanitizedId = rawId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 48) || getLocalReferralSeed();
+    const startParam = "ref_" + sanitizedId;
+    return "https://t.me/" + BOT_USERNAME + "?start=" + encodeURIComponent(startParam);
+  }
+
+  function setRing(progress, tone) {
+    const safe = Math.max(0.05, Math.min(1, progress));
+    ringFill.setAttribute("stroke-dashoffset", String(RING * (1 - safe)));
+    ringFill.style.stroke = tone === "danger" ? "var(--danger)" : tone === "trial" ? "var(--warning)" : "var(--mint)";
+  }
+
+  function setStatusView(kind, daysLeft) {
+    document.getElementById("days-num").textContent = String(daysLeft);
+    document.getElementById("days-unit").textContent = daysWord(daysLeft);
+
+    if (kind === "expired") {
+      document.getElementById("hero-title").textContent = "Нужна оплата";
+      document.getElementById("hero-sub").textContent = "Подписка закончилась. Пополни баланс или выбери тариф.";
+      statusPill.className = "status-pill expired";
+      statusPill.textContent = "Не активна";
+      setRing(0.05, "danger");
+      return;
+    }
+
+    if (kind === "trial") {
+      document.getElementById("hero-title").textContent = "Пробный доступ";
+      document.getElementById("hero-sub").textContent = "Скопируй ссылку и подключись. Потом можно продлить за 100 ₽ в месяц.";
+      statusPill.className = "status-pill";
+      statusPill.textContent = "Пробный период";
+      setRing(daysLeft / TRIAL_TOTAL_DAYS, "trial");
+      return;
+    }
+
+    document.getElementById("hero-title").textContent = "VPN работает";
+    document.getElementById("hero-sub").textContent = "Все самое важное видно сразу при входе.";
+    statusPill.className = "status-pill active";
+    statusPill.textContent = "Активна";
+    setRing(daysLeft / 30, "active");
+  }
+
+  function openDeviceSettings() {
+    homeScreen.classList.add("hidden");
+    deviceScreen.classList.remove("hidden");
+    restartScreenAnimation(deviceScreen);
+  }
+
+  function closeDeviceSettings() {
+    deviceScreen.classList.add("hidden");
+    homeScreen.classList.remove("hidden");
+    restartScreenAnimation(homeScreen);
+  }
+
+  function restartScreenAnimation(screen) {
+    document.body.classList.remove("app-ready");
+    void screen.offsetHeight;
+    requestAnimationFrame(() => {
+      document.body.classList.add("app-ready");
+    });
+  }
 
   async function loadStatus() {
-    if (!token) return; // открыли без токена (например, вручную) — остаются демо-значения
+    if (!token) {
+      homeScreen.classList.remove("loading");
+      return;
+    }
+
     try {
-      const res = await fetch('/api/status?token=' + encodeURIComponent(token));
-      if (!res.ok) return;
-      const data = await res.json();
+      const response = await fetch("/api/status?token=" + encodeURIComponent(token));
+      if (!response.ok) throw new Error("Status request failed");
 
-      document.getElementById('days-num').textContent = data.days_left;
-      document.getElementById('sub-link').textContent = data.sub_link;
+      const data = await response.json();
+      const daysLeft = Number(data.days_left || 0);
+      const balanceValue = Number(data.balance ?? data.user_balance ?? 0);
+      const affordableDays = Math.floor(balanceValue / 100) * 30;
+      const lowBalance = balanceValue > 0 && affordableDays <= 3;
+      const deviceName = data.device_name || "140226851 Vless (iPhone/iPad)";
+      const shortDeviceName = data.device_short_name || "V140226851 (iPhone/iPad)";
+      const deviceDate = data.device_date || "26.06.26";
+      const configLink = data.device_config_link || data.sub_link || "https://hvpn.io/ATxZgKFyUQQ-41vA8rd4ihwly...";
 
-      const pill = document.querySelector('.status-pill');
-      const desc = document.querySelector('.status-info .desc');
-      const ring = document.getElementById('ring-progress');
-      const circumference = 251;
+      subLink.textContent = data.sub_link || "Ссылка пока недоступна";
+      balanceAmount.textContent = balanceValue + " ₽";
+      balanceMainAmount.textContent = String(balanceValue);
+      balanceDaysHint.textContent = "Хватит на ~" + affordableDays + " дней";
+      deviceBalanceAmount.textContent = balanceValue + " ₽";
+      deviceCardName.textContent = shortDeviceName;
+      deviceCardDate.textContent = deviceDate;
+      deviceDetailTitle.textContent = deviceName;
+      deviceNameInput.value = data.device_label || "Мой iPhone";
+      deviceConfigLink.textContent = configLink;
+      balanceAmount.classList.toggle("low", lowBalance || daysLeft <= 3);
+      balanceDaysHint.classList.toggle("low", lowBalance || daysLeft <= 3);
+
+      if (!data.sub_link) {
+        setFeedback("error", "Ссылка пока недоступна. Попробуй открыть миниаппку из бота еще раз.");
+      } else {
+        clearFeedback();
+      }
 
       if (!data.active) {
-        pill.classList.add('expired');
-        pill.querySelector('span:last-child').textContent = 'Не активна';
-        desc.textContent = 'Подписка закончилась. Выбери тариф ниже, чтобы продолжить пользоваться VPN.';
-        ring.setAttribute('stroke-dashoffset', circumference);
+        setStatusView("expired", daysLeft);
       } else if (!data.trial_used) {
-        desc.textContent = `Осталось ${data.days_left} дн. бесплатного доступа. Продли подписку, чтобы не потерять соединение.`;
-        ring.setAttribute('stroke-dashoffset', circumference * (1 - data.days_left / TRIAL_TOTAL_DAYS));
+        setStatusView("trial", daysLeft);
       } else {
-        pill.querySelector('span:last-child').textContent = 'Активна';
-        desc.textContent = `Осталось ${data.days_left} дн. Хорошего пользования!`;
-        ring.setAttribute('stroke-dashoffset', circumference * 0.15);
+        setStatusView("active", daysLeft);
       }
-    } catch (e) {
-      console.error('status load failed', e);
+    } catch (error) {
+      setStatusView("expired", 0);
+      subLink.textContent = "Не удалось загрузить ссылку";
+      setFeedback("error", "Не получилось загрузить статус. Открой миниаппку из бота еще раз.");
+    } finally {
+      homeScreen.classList.remove("loading");
     }
   }
-  loadStatus();
 
-  function copyLink() {
-    const linkText = document.getElementById('sub-link').textContent;
-    const btn = document.getElementById('copy-btn');
-    navigator.clipboard.writeText(linkText).then(() => {
-      btn.textContent = 'Готово';
-      btn.classList.add('copied');
-      setTimeout(() => { btn.textContent = 'Копировать'; btn.classList.remove('copied'); }, 1500);
+  function copyHomeLink() {
+    const value = subLink.textContent.trim();
+    if (!value || value.includes("недоступна") || value.includes("Не удалось")) {
+      setFeedback("error", "Пока нечего копировать. Сначала дождись загрузки ссылки.");
+      return;
+    }
+
+    navigator.clipboard.writeText(value).then(() => {
+      copyBtn.textContent = "Скопировано";
+      setFeedback("success", "Ссылка скопирована.");
+      showToast("Ссылка скопирована.");
+      setTimeout(() => {
+        copyBtn.textContent = "Копировать";
+      }, 1500);
     });
-    if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+  }
+
+  function copyDeviceLink() {
+    navigator.clipboard.writeText(deviceConfigLink.textContent.trim());
+    showToast("Ссылка скопирована.");
+    if (tg && tg.HapticFeedback) {
+      tg.HapticFeedback.notificationOccurred("success");
+    }
+  }
+
+  function copyReferralLink() {
+    const referralLink = buildReferralLink();
+    navigator.clipboard.writeText(referralLink).then(() => {
+      clearFeedback();
+      showToast("Ссылка скопирована.");
+      if (tg && tg.HapticFeedback) {
+        tg.HapticFeedback.notificationOccurred("success");
+      }
+    }).catch(() => {
+      setFeedback("error", "Не получилось скопировать ссылку.");
+      showToast("Не получилось скопировать");
+    });
   }
 
   function togglePlans() {
-    document.getElementById('plans-block').classList.toggle('open');
+    plansBlock.classList.toggle("open");
   }
 
   function buyPlan(days, price) {
     if (tg) {
-      tg.sendData(JSON.stringify({ action: 'buy_plan', days, price }));
+      tg.sendData(JSON.stringify({ action: "buy_plan", days: days, price: price }));
     }
   }
 
   function sendToBot(action) {
     if (tg) {
-      tg.sendData(JSON.stringify({ action }));
+      tg.sendData(JSON.stringify({ action: action }));
     }
   }
+
+  requestAnimationFrame(() => {
+    document.body.classList.add("intro-play");
+  });
+
+  setTimeout(() => {
+    document.body.classList.add("app-ready");
+  }, 740);
+
+  setTimeout(() => {
+    document.body.classList.remove("intro-play");
+  }, 1240);
+
+  loadStatus();
 </script>
 </body>
 </html>
