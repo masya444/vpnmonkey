@@ -46,14 +46,25 @@ dp = Dispatcher()
 def main_menu_kb(sub_token: str | None = None):
     kb = InlineKeyboardBuilder()
     if sub_token:
-        kb.button(
-            text="🐒 Открыть Monkey VPN",
-            web_app=WebAppInfo(url=f"{config.sub_public_base_url}/app?token={sub_token}"),
-        )
+        app_url = f"{config.sub_public_base_url}/app?token={sub_token}"
+        if app_url.startswith("https://"):
+            # Мини-аппа открывается прямо внутри Telegram — но Telegram требует HTTPS.
+            kb.button(text="🐒 Открыть Monkey VPN", web_app=WebAppInfo(url=app_url))
+        else:
+            # Пока нет домена с SSL (тестируем на голом IP) — обычная кнопка-ссылка,
+            # она откроется в браузере вместо встроенного окна, но хотя бы не роняет бота.
+            kb.button(text="🐒 Открыть Monkey VPN", url=app_url)
+    kb.button(text="🔑 Мой ключ", callback_data="my_key")
+    kb.button(text="💳 Тарифы", callback_data="plans")
     kb.button(text="👥 Пригласить друга", callback_data="referral")
     kb.button(text="📱 Как подключиться", callback_data="how_to")
     kb.button(text="🆘 Поддержка", callback_data="support")
-    kb.adjust(1)
+    # Первая кнопка (мини-аппка) — на всю ширину, остальные — по 2 в ряд,
+    # чтобы всё влезало на один экран и было легче кликать пальцем.
+    if sub_token:
+        kb.adjust(1, 2, 2, 1)
+    else:
+        kb.adjust(2, 2, 1)
     return kb.as_markup()
 
 
