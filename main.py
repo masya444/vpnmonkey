@@ -24,11 +24,13 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, CallbackQuery, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiohttp import web
 
 from config import config, validate_config
 import database as db
 import panel
-from subscription import run_subscription_server
+from subscription import run_subscription_server, create_app as create_sub_app
 
 logging.basicConfig(
     level=logging.INFO,
@@ -344,12 +346,46 @@ async def main():
         return
 
     db.init_db()
-    log.info("%s bot starting", config.app_name)
+    log.info("%s bot starting (webhook=%s)", config.app_name, config.use_webhook)
 
-    await asyncio.gather(
-        dp.start_polling(bot),
-        run_subscription_server(config.sub_server_host, config.sub_server_port),
-    )
+    if config.use_webhook:
+        # Режим для бесплатных хостингов вроде Render: один общий aiohttp-сервер
+        # одновременно обслуживает и подписки/мини-аппку (subscription.py), и вебхук бота —
+        # Telegram сам стучится сюда при каждом новом сообщении, никакого фонового
+        # процесса "опроса" (polling) не требуется, поэтому это работает на обычном
+        # бесплатном веб-сервисе.
+        webhook_url = f"{config.sub_public_base_url}{config.webhook_path}"
+        await bot.set_webhook(
+            webhook_url,
+            secret_token=config.webhook_secret or None,
+            drop_pending_updates=True,
+        )
+        log.info("Webhook set to %s", webhook_url)
+
+        app = create_sub_app()
+        SimpleRequestHandler(
+            dispatcher=dp,
+            bot=bot,
+            secret_token=config.webhook_secret or None,
+        ).register(app, path=config.webhook_path)
+        setup_application(app, dp, bot=bot)
+
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", config.port)
+        await site.start()
+        log.info("Webhook server listening on 0.0.0.0:%s", config.port)
+
+        # Держим процесс живым вечно (aiohttp сам обрабатывает запросы в фоне).
+        await asyncio.Event().wait()
+    else:
+        # Обычный режим для VPS/Railway — бот сам постоянно спрашивает Telegram
+        # о новых сообщениях (polling), плюс отдельно поднят сервер подписок/мини-аппки.
+        await bot.delete_webhook(drop_pending_updates=True)
+        await asyncio.gather(
+            dp.start_polling(bot),
+            run_subscription_server(config.sub_server_host, config.port),
+        )
 
 
 if __name__ == "__main__":
