@@ -34,6 +34,16 @@ class Config:
     sub_server_port: int = int(os.getenv("SUB_SERVER_PORT", "8080"))
     sub_public_base_url: str = os.getenv("SUB_PUBLIC_BASE_URL", "http://YOUR_SERVER_IP:8080")
 
+    # Режим работы бота: webhook (для бесплатных веб-хостингов типа Render, которые дают
+    # публичный HTTP-адрес, но не дают держать вечный фоновый процесс) или polling
+    # (для VPS/Railway, где можно просто гонять бота в фоне).
+    use_webhook: bool = os.getenv("USE_WEBHOOK", "false").lower() == "true"
+    webhook_path: str = os.getenv("WEBHOOK_PATH", "/webhook")
+    webhook_secret: str = os.getenv("WEBHOOK_SECRET", "")
+    # Render и подобные платформы сами подставляют порт через переменную PORT —
+    # если она есть, используем её вместо SUB_SERVER_PORT.
+    port: int = int(os.getenv("PORT", os.getenv("SUB_SERVER_PORT", "8080")))
+
     trial_days: int = int(os.getenv("TRIAL_DAYS", "3"))
     referral_bonus_days: int = int(os.getenv("REFERRAL_BONUS_DAYS", "2"))
 
