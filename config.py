@@ -46,6 +46,7 @@ class Config:
 
     trial_days: int = int(os.getenv("TRIAL_DAYS", "3"))
     referral_bonus_days: int = int(os.getenv("REFERRAL_BONUS_DAYS", "2"))
+    max_devices: int = int(os.getenv("MAX_DEVICES", "3"))
 
     # Временный тестовый режим: True = бот не стучится в реальную VPN-панель,
     # а выдает фейковый ключ. Нужен, чтобы проверить логику бота (меню, триал,
