@@ -43,28 +43,35 @@ bot = Bot(token=config.bot_token)
 dp = Dispatcher()
 
 
-def main_menu_kb(sub_token: str | None = None):
+def main_menu_kb():
+    """Главное меню в стиле Utka VPN: крупная кнопка подключения сверху,
+    затем подписка и рефералка отдельными строками, снизу — поддержка и о сервисе."""
     kb = InlineKeyboardBuilder()
-    if sub_token:
-        app_url = f"{config.sub_public_base_url}/app?token={sub_token}"
-        if app_url.startswith("https://"):
-            # Мини-аппа открывается прямо внутри Telegram — но Telegram требует HTTPS.
-            kb.button(text="🐒 Открыть Monkey VPN", web_app=WebAppInfo(url=app_url))
-        else:
-            # Пока нет домена с SSL (тестируем на голом IP) — обычная кнопка-ссылка,
-            # она откроется в браузере вместо встроенного окна, но хотя бы не роняет бота.
-            kb.button(text="🐒 Открыть Monkey VPN", url=app_url)
-    kb.button(text="🔑 Мой ключ", callback_data="my_key")
-    kb.button(text="💳 Тарифы", callback_data="plans")
-    kb.button(text="👥 Пригласить друга", callback_data="referral")
+    kb.button(text="🚀 Подключить VPN", callback_data="connect_vpn")
+    kb.button(text="🔑 Моя подписка", callback_data="my_subscription")
+    kb.button(text="🎁 Пригласить и получить дни", callback_data="referral")
     kb.button(text="📱 Как подключиться", callback_data="how_to")
     kb.button(text="🆘 Поддержка", callback_data="support")
-    # Первая кнопка (мини-аппка) — на всю ширину, остальные — по 2 в ряд,
-    # чтобы всё влезало на один экран и было легче кликать пальцем.
-    if sub_token:
-        kb.adjust(1, 2, 2, 1)
+    kb.button(text="ℹ️ О сервисе", callback_data="about")
+    kb.adjust(1, 1, 1, 1, 2)
+    return kb.as_markup()
+
+
+def webapp_url_for(sub_token: str) -> str:
+    return f"{config.sub_public_base_url}/app?token={sub_token}"
+
+
+def subscription_kb(sub_token: str):
+    """Клавиатура на экране 'Моя подписка': если есть мини-аппа по HTTPS — открыть её,
+    иначе обычная ссылка (Telegram требует HTTPS именно для web_app-кнопок)."""
+    kb = InlineKeyboardBuilder()
+    app_url = webapp_url_for(sub_token)
+    if app_url.startswith("https://"):
+        kb.button(text="🐒 Открыть Monkey VPN", web_app=WebAppInfo(url=app_url))
     else:
-        kb.adjust(2, 2, 1)
+        kb.button(text="🐒 Открыть Monkey VPN", url=app_url)
+    kb.button(text="⬅️ Назад", callback_data="back_to_menu")
+    kb.adjust(1)
     return kb.as_markup()
 
 
@@ -152,18 +159,19 @@ async def start_handler(message: Message):
     else:
         text = f"С возвращением, {first_name}! Статус подписки: {format_time_left(user['subscription_until'])}."
 
-    await message.answer(text, reply_markup=main_menu_kb(user["sub_token"]))
+    await message.answer(text, reply_markup=main_menu_kb())
 
 
 @dp.callback_query(F.data == "back_to_menu")
 async def back_to_menu(call: CallbackQuery):
-    user = db.get_user(call.from_user.id) or db.get_or_create_user(call.from_user.id, "user")
-    await call.message.edit_text("Главное меню:", reply_markup=main_menu_kb(user["sub_token"] if user else None))
+    await call.message.edit_text("Главное меню:", reply_markup=main_menu_kb())
     await call.answer()
 
 
-@dp.callback_query(F.data == "my_key")
-async def my_key(call: CallbackQuery):
+@dp.callback_query(F.data == "connect_vpn")
+async def connect_vpn(call: CallbackQuery):
+    """Кнопка 'Подключить VPN': первый раз — выдаёт бесплатный триал,
+    дальше — ведёт к выбору платного тарифа (как у Utka VPN)."""
     user_id = call.from_user.id
     user = db.get_user(user_id) or db.get_or_create_user(user_id, call.from_user.username or call.from_user.full_name)
 
@@ -186,19 +194,40 @@ async def my_key(call: CallbackQuery):
         user = db.get_user(user_id) or db.get_or_create_user(user_id, "user")
 
         await call.message.edit_text(
-            f"Готово! Пробный период — {config.trial_days} дня.\n\n"
+            f"Готово! Пробный период — {config.trial_days} дня, до {config.max_devices} устройств.\n\n"
             f"Твоя ссылка подписки (вставляется один раз):\n"
             f"`{sub_link_for(user)}`\n\n"
             f"Как подключиться — жми кнопку «Как подключиться» в меню.",
             parse_mode="Markdown",
-            reply_markup=back_kb(),
+            reply_markup=subscription_kb(user["sub_token"]),
         )
         return
 
-    if not db.is_subscription_active(user_id):
+    await call.message.edit_text(
+        f"Любой тариф включает до {config.max_devices} устройств.\n\nВыбери срок подписки:",
+        reply_markup=plans_kb(),
+    )
+
+
+@dp.callback_query(F.data == "my_subscription")
+async def my_subscription(call: CallbackQuery):
+    """Кнопка 'Моя подписка': только статус, ничего не активирует."""
+    user_id = call.from_user.id
+    user = db.get_user(user_id) or db.get_or_create_user(user_id, call.from_user.username or call.from_user.full_name)
+
+    if not user["trial_used"] or not db.is_subscription_active(user_id):
         await call.message.edit_text(
-            "Подписка закончилась. Выбери тариф, чтобы продолжить:",
-            reply_markup=plans_kb(),
+            "❌ Нет активной подписки.\n\n"
+            + (
+                f"Подключи бесплатные {config.trial_days} дня или выбери тариф."
+                if not user["trial_used"]
+                else "Подписка закончилась. Выбери тариф, чтобы продолжить."
+            ),
+            reply_markup=InlineKeyboardBuilder()
+            .button(text="🚀 Подключить VPN", callback_data="connect_vpn")
+            .button(text="⬅️ Назад", callback_data="back_to_menu")
+            .adjust(1)
+            .as_markup(),
         )
         return
 
@@ -206,8 +235,21 @@ async def my_key(call: CallbackQuery):
         f"Твоя ссылка подписки:\n`{sub_link_for(user)}`\n\n"
         f"Статус: {format_time_left(user['subscription_until'])}.",
         parse_mode="Markdown",
-        reply_markup=back_kb(),
+        reply_markup=subscription_kb(user["sub_token"]),
     )
+
+
+@dp.callback_query(F.data == "about")
+async def about(call: CallbackQuery):
+    text = (
+        f"ℹ️ О сервисе {config.app_name}\n\n"
+        f"🐒 Быстрое подключение — доступ выдаётся за пару минут\n"
+        f"🔒 Защищённое соединение без просадок скорости\n"
+        f"🌍 Доступ к нужным сайтам и сервисам\n"
+        f"📱 До {config.max_devices} устройств на одной подписке\n"
+        f"🔓 Честные условия — без скрытых списаний"
+    )
+    await call.message.edit_text(text, reply_markup=back_kb())
 
 
 @dp.callback_query(F.data == "how_to")
@@ -256,10 +298,15 @@ async def referral(call: CallbackQuery):
     bot_info = await bot.get_me()
     link = f"https://t.me/{bot_info.username}?start=ref_{user_id}"
     count = db.count_referrals(user_id)
-    user = db.get_user(user_id) or db.get_or_create_user(user_id, "user")
+    earned_days = count * config.referral_bonus_days
     await call.message.edit_text(
-        f"Приглашай друзей — за каждого +{config.referral_bonus_days} дня подписки тебе.\n\n"
-        f"Твоя ссылка:\n{link}\n\nУже пригласил: {count} чел.",
+        f"🎁 Приглашай друзей с {config.app_name}\n\n"
+        f"Получай +{config.referral_bonus_days} дня подписки за каждого друга, "
+        f"который зайдёт по твоей ссылке.\n\n"
+        f"Друзей приглашено: {count}\n"
+        f"Дней начислено: {earned_days}\n"
+        f"Твой ID: {user_id}\n\n"
+        f"Твоя ссылка:\n{link}",
         reply_markup=back_kb(),
     )
 
