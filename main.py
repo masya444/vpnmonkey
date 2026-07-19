@@ -140,23 +140,18 @@ async def start_handler(message: Message):
             pass
 
     user = db.get_user(user_id) or db.get_or_create_user(user_id, "user")
-    first_name = message.from_user.first_name or "друг"
 
     if not user["trial_used"]:
-        cheapest_price = config.plans[0][2]
         text = (
-            f"Привет, {first_name}! 🐒\n\n"
-            f"Подключи VPN бесплатно! Дарим тебе {config.trial_days} дня пробного периода.\n\n"
-            f"💰 от {cheapest_price}₽/мес — недорого\n"
-            f"🚀 высокая скорость, без просадок\n"
-            f"🔓 доступ ко всем сайтам и сервисам\n"
-            f"🔒 честные условия — без скрытых списаний\n\n"
-            f"👥 Приглашай друзей — тебе +{config.referral_bonus_days} дня за каждого, "
-            f"кто подключится по твоей ссылке.\n\n"
-            f"⬇️ Жми кнопку ниже!"
+            f"Привет! Я — {config.app_name} 🐒\n\n"
+            f"Помогу подключить VPN за пару минут.\n\n"
+            f"⚡ Быстрое подключение\n"
+            f"🛡 Защищённое соединение\n"
+            f"🌍 Доступ к нужным сайтам\n\n"
+            f"Дарим {config.trial_days} дня бесплатного пробного периода 🎁"
         )
     else:
-        text = f"С возвращением, {first_name}! Статус подписки: {format_time_left(user['subscription_until'])}."
+        text = f"С возвращением! Статус подписки: {format_time_left(user['subscription_until'])}."
 
     await message.answer(text, reply_markup=main_menu_kb())
 
