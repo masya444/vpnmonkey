@@ -44,16 +44,15 @@ dp = Dispatcher()
 
 
 def main_menu_kb():
-    """Главное меню в стиле Utka VPN: крупная кнопка подключения сверху,
-    затем подписка и рефералка отдельными строками, снизу — поддержка и о сервисе."""
+    """Главное меню — расположение один-в-один как у Utka VPN:
+    каждая кнопка в своей строке, кроме последней пары."""
     kb = InlineKeyboardBuilder()
-    kb.button(text="🚀 Подключить VPN", callback_data="connect_vpn")
+    kb.button(text="Подключить VPN 🚀", callback_data="connect_vpn", style="success")
     kb.button(text="🔑 Моя подписка", callback_data="my_subscription")
     kb.button(text="🎁 Пригласить и получить дни", callback_data="referral")
-    kb.button(text="📱 Как подключиться", callback_data="how_to")
     kb.button(text="🆘 Поддержка", callback_data="support")
     kb.button(text="ℹ️ О сервисе", callback_data="about")
-    kb.adjust(1, 1, 1, 1, 2)
+    kb.adjust(1, 1, 1, 2)
     return kb.as_markup()
 
 
@@ -197,7 +196,9 @@ async def connect_vpn(call: CallbackQuery):
             f"Готово! Пробный период — {config.trial_days} дня, до {config.max_devices} устройств.\n\n"
             f"Твоя ссылка подписки (вставляется один раз):\n"
             f"`{sub_link_for(user)}`\n\n"
-            f"Как подключиться — жми кнопку «Как подключиться» в меню.",
+            f"Как подключиться:\n"
+            f"1️⃣ Установи приложение — Android: v2rayNG, iPhone/Mac: Hiddify или Happ, Windows: Hiddify\n"
+            f"2️⃣ В приложении выбери «Добавить подписку по ссылке» и вставь ссылку выше",
             parse_mode="Markdown",
             reply_markup=subscription_kb(user["sub_token"]),
         )
