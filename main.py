@@ -84,9 +84,22 @@ def back_kb():
 
 def plans_kb():
     kb = InlineKeyboardBuilder()
-    for name, days, price in config.plans:
-        kb.button(text=f"{name} — {price}₽", callback_data=f"buy_{days}_{price}")
+    for i, (name, days, price) in enumerate(config.plans):
+        kb.button(text=f"{name} — {price}₽", callback_data=f"plan_{i}")
     kb.button(text="⬅️ Назад", callback_data="back_to_menu")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def payment_methods_kb(plan_idx: int):
+    """Экран выбора способа оплаты — точь-в-точь как у Utka VPN."""
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🇷🇺 СБП", callback_data=f"pay_sbp_{plan_idx}")
+    kb.button(text="💳 Карта", callback_data=f"pay_card_{plan_idx}")
+    kb.button(text="🔷 CryptoBot", callback_data=f"pay_crypto_{plan_idx}")
+    kb.button(text="⭐ Telegram Stars", callback_data=f"pay_stars_{plan_idx}")
+    kb.button(text="🌐 Другие способы", callback_data=f"pay_other_{plan_idx}")
+    kb.button(text="⬅️ Назад", callback_data="plans")
     kb.adjust(1)
     return kb.as_markup()
 
@@ -266,21 +279,48 @@ async def plans(call: CallbackQuery):
     await call.message.edit_text("Выбери тариф:", reply_markup=plans_kb())
 
 
-@dp.callback_query(F.data.startswith("buy_"))
-async def buy(call: CallbackQuery):
-    _, days, price = call.data.split("_")
-    db.log_payment(call.from_user.id, int(price), int(days), status="pending")
-    user = db.get_user(call.from_user.id) or db.get_or_create_user(call.from_user.id, "user")
-    # TODO: реальная интеграция с ЮKassa/CryptoBot вместо ручного подтверждения.
+@dp.callback_query(F.data.startswith("plan_"))
+async def plan_selected(call: CallbackQuery):
+    idx = int(call.data.removeprefix("plan_"))
+    name, days, price = config.plans[idx]
+    text = (
+        f"Покупка VPN\n\n"
+        f"Тариф: {name}\n"
+        f"Доступно: до {config.max_devices} устройств\n"
+        f"К оплате: {price}₽\n\n"
+        f"Выбери способ оплаты:"
+    )
+    await call.message.edit_text(text, reply_markup=payment_methods_kb(idx))
+
+
+PAYMENT_METHOD_NAMES = {
+    "sbp": "СБП",
+    "card": "Карта",
+    "crypto": "CryptoBot",
+    "stars": "Telegram Stars",
+    "other": "Другой способ",
+}
+
+
+@dp.callback_query(F.data.startswith("pay_"))
+async def pay_method_selected(call: CallbackQuery):
+    _, method, idx_s = call.data.split("_")
+    idx = int(idx_s)
+    name, days, price = config.plans[idx]
+    method_name = PAYMENT_METHOD_NAMES.get(method, method)
+
+    # TODO: реальная интеграция с ЮKassa/CryptoBot/Stars вместо ручного подтверждения.
+    db.log_payment(call.from_user.id, int(price), int(days), status=f"pending_{method}")
     await call.message.edit_text(
-        f"Тариф на {days} дней за {price}₽.\n\n"
-        f"Пока оплата подключается вручную: напиши в поддержку с этим тарифом, "
+        f"Тариф «{name}» за {price}₽, способ оплаты: {method_name}.\n\n"
+        f"Пока оплата подключается вручную: напиши в поддержку с этим тарифом и способом оплаты, "
         f"оплати переводом — и подписка активируется в течение нескольких минут.",
         reply_markup=back_kb(),
     )
     await notify_admin(
         f"Новая заявка на оплату: user_id={call.from_user.id}, "
-        f"тариф {days} дней за {price}₽. Подтвердить: /confirm {call.from_user.id} {days} {price}"
+        f"тариф «{name}» на {days} дней за {price}₽, способ: {method_name}. "
+        f"Подтвердить: /confirm {call.from_user.id} {days} {price}"
     )
 
 
