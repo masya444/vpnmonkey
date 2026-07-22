@@ -143,12 +143,11 @@ async def start_handler(message: Message):
 
     if not user["trial_used"]:
         text = (
-            f"Привет! Я — {config.app_name} 🐒\n\n"
-            f"Помогу подключить VPN за пару минут.\n\n"
+            f"Привет! Я — {config.app_name} 🐵\n\n"
+            f"Подключи свой VPN здесь.\n\n"
             f"⚡ Быстрое подключение\n"
-            f"🛡 Защищённое соединение\n"
-            f"🌍 Доступ к нужным сайтам\n\n"
-            f"Дарим {config.trial_days} дня бесплатного пробного периода 🎁"
+            f"🛡️ Максимальная защита\n"
+            f"🌍 Доступ ко всем сайтам"
         )
     else:
         text = f"С возвращением! Статус подписки: {format_time_left(user['subscription_until'])}."
