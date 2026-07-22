@@ -141,16 +141,13 @@ async def start_handler(message: Message):
 
     user = db.get_user(user_id) or db.get_or_create_user(user_id, "user")
 
-    if not user["trial_used"]:
-        text = (
-            f"Привет! Я — {config.app_name} 🐵\n\n"
-            f"Подключи свой VPN здесь.\n\n"
-            f"⚡ Быстрое подключение\n"
-            f"🛡️ Максимальная защита\n"
-            f"🌍 Доступ ко всем сайтам"
-        )
-    else:
-        text = f"С возвращением! Статус подписки: {format_time_left(user['subscription_until'])}."
+    text = (
+        f"Привет! Я — {config.app_name} 🐵\n\n"
+        f"Подключи свой VPN здесь.\n\n"
+        f"⚡ Быстрое подключение\n"
+        f"🛡️ Максимальная защита\n"
+        f"🌍 Доступ ко всем сайтам"
+    )
 
     await message.answer(text, reply_markup=main_menu_kb())
 
