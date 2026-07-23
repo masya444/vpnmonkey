@@ -55,10 +55,10 @@ class Config:
     fake_vpn_server: bool = os.getenv("FAKE_VPN_SERVER", "true").lower() == "true"
 
     plans: tuple = (
-        ("1 месяц", 30, 99),
-        ("3 месяца", 90, 249),
-        ("6 месяцев", 180, 449),
-        ("12 месяцев", 365, 799),
+        ("1 месяц", 30, 189),
+        ("3 месяца", 90, 479),
+        ("6 месяцев", 180, 790),
+        ("12 месяцев", 365, 1290),
     )
 
     servers: list = field(default_factory=lambda: [
