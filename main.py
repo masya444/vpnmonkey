@@ -85,7 +85,7 @@ def back_kb():
 def plans_kb():
     kb = InlineKeyboardBuilder()
     for i, (name, days, price) in enumerate(config.plans):
-        kb.button(text=f"{name} — {price}₽", callback_data=f"plan_{i}")
+        kb.button(text=f"{name} - {price}₽", callback_data=f"plan_{i}")
     kb.button(text="⬅️ Назад", callback_data="back_to_menu")
     kb.adjust(1)
     return kb.as_markup()
@@ -97,7 +97,6 @@ def payment_methods_kb(plan_idx: int):
     kb.button(text="🇷🇺 СБП", callback_data=f"pay_sbp_{plan_idx}")
     kb.button(text="💳 Карта", callback_data=f"pay_card_{plan_idx}")
     kb.button(text="🔷 CryptoBot", callback_data=f"pay_crypto_{plan_idx}")
-    kb.button(text="⭐ Telegram Stars", callback_data=f"pay_stars_{plan_idx}")
     kb.button(text="🌐 Другие способы", callback_data=f"pay_other_{plan_idx}")
     kb.button(text="⬅️ Назад", callback_data="plans")
     kb.adjust(1)
@@ -297,7 +296,6 @@ PAYMENT_METHOD_NAMES = {
     "sbp": "СБП",
     "card": "Карта",
     "crypto": "CryptoBot",
-    "stars": "Telegram Stars",
     "other": "Другой способ",
 }
 
@@ -309,7 +307,7 @@ async def pay_method_selected(call: CallbackQuery):
     name, days, price = config.plans[idx]
     method_name = PAYMENT_METHOD_NAMES.get(method, method)
 
-    # TODO: реальная интеграция с ЮKassa/CryptoBot/Stars вместо ручного подтверждения.
+    # TODO: реальная интеграция с ЮKassa/CryptoBot вместо ручного подтверждения.
     db.log_payment(call.from_user.id, int(price), int(days), status=f"pending_{method}")
     await call.message.edit_text(
         f"Тариф «{name}» за {price}₽, способ оплаты: {method_name}.\n\n"
